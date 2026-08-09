@@ -66,3 +66,9 @@ npm run dist
 ```
 
 生成的便携版 EXE 会在 `dist/` 文件夹内。应用不联网，数据保存在本机 Electron userData 目录。
+
+## 在线访问（浏览器版）
+
+https://chouyangceng.github.io/mistake-notebook-kaoyan/
+
+> 桌面版（Electron）仍支持局域网同步；浏览器版数据存于各浏览器 localStorage，互不共享。
