@@ -15,24 +15,24 @@
       <div class="brand"><div class="brand-mark">拾</div><div><strong>拾题</strong><span>考研错题本</span></div></div>
       <div class="nav-label">工作台</div>
       <button class="nav-item active" data-view="library" data-title="错题库"><span>▦</span>错题库 <em id="totalCount">0</em></button>
-      <button class="nav-item" data-view="review" data-title="今日复习"><span>◷</span>今日复习 <em>3</em></button>
+      <button class="nav-item" data-view="review" data-title="今日复习"><span>◷</span>今日复习 <em id="navReviewCount">0</em></button>
       <button class="nav-item" data-view="insights" data-title="学习洞察"><span>⌁</span>学习洞察</button>
       <button class="nav-item" data-view="config" data-title="科目配置"><span>⚙</span>科目配置</button>
       <button class="nav-item" data-view="guide" data-title="使用指引"><span>☰</span>使用指引</button>
       <div class="nav-label subjects-label">我的科目</div>
       <div id="subjectNav"></div>
       <button class="add-subject" id="addSubject">＋ 添加科目</button>
-      <div class="sidebar-bottom"><div class="streak"><span>连续学习</span><strong>12 <small>天</small></strong><i>↗</i></div><button class="settings">⚙ 设置</button></div>
+      <div class="sidebar-bottom"><div class="streak"><span>连续学习</span><strong id="streakDays">0 <small>天</small></strong><i>↗</i></div><button class="settings">⚙ 设置</button></div>
     </aside>
     <main class="main">
-      <header class="topbar"><div><p class="eyebrow">SATURDAY · AUG 08</p><h1 id="pageTitle">错题库</h1></div><div class="top-actions"><button class="icon-btn" title="搜索错题" aria-label="搜索错题">搜索</button><button class="primary-btn" id="newQuestion">新建错题</button><div class="avatar">林</div></div></header>
+      <header class="topbar"><div><p class="eyebrow" id="todayLabel">TODAY</p><h1 id="pageTitle">错题库</h1></div><div class="top-actions"><button class="icon-btn" title="搜索错题" aria-label="搜索错题">搜索</button><button class="primary-btn" id="newQuestion">新建错题</button><div class="avatar">林</div></div></header>
       <section id="libraryView" class="view active-view">
-        <div class="overview-row"><div><p class="muted">把做错的题，变成下一次做对的底气。</p></div><div class="progress-card"><div><span>本周复习进度</span><strong>68%</strong></div><div class="progress-track"><i style="width:68%"></i></div><small>还剩 4 道待复习</small></div></div>
+        <div class="overview-row"><div><p class="muted">把做错的题，变成下一次做对的底气。</p></div><div class="progress-card"><div><span>本周复习进度</span><strong id="weekProgress">0%</strong></div><div class="progress-track"><i id="weekProgressBar" style="width:0%"></i></div><small id="weekRemain">本周暂无复习记录</small></div></div>
         <div class="filters"><div class="segmented" id="subjectFilters"></div><div class="filter-right"><select id="unitFilter" aria-label="按模块或单元筛选"><option value="all">全部单元</option></select><select id="sortFilter" aria-label="错题排序方式"><option value="recent">最近添加</option><option value="hard">难度优先</option></select><button class="view-toggle active" title="卡片视图" aria-label="切换到卡片视图">卡片视图</button><button class="view-toggle" title="紧凑视图" aria-label="切换到紧凑视图">紧凑视图</button></div></div>
         <div class="content-grid"><div><div class="section-head"><h2 id="listHeading">全部错题 <span id="listCount">0</span></h2><button class="ghost-btn" id="importBtn">⇧ 导入 PDF 截图</button><input id="fileInput" type="file" accept="image/*,.pdf" hidden /></div><div id="questionList" class="question-list"></div></div><aside class="right-rail"><div class="rail-card accent-card"><div class="rail-icon">↯</div><div><strong>掌握你的薄弱点</strong><p>最近错题集中在「线性代数 · 特征值」</p><button id="focusWeak">查看专项练习 →</button></div></div><div class="rail-card"><div class="section-head compact"><h3>知识点分布</h3><span class="muted">本月</span></div><div id="topicBars"></div></div><div class="rail-card"><div class="section-head compact"><h3>复习日历</h3><span class="muted">2026年8月</span></div><div class="calendar" id="calendar"></div></div></aside></div>
       </section>
       <section id="reviewView" class="view"><div class="section-head"><div><p class="eyebrow">SPACED REVIEW</p><h2>今日复习 <span id="reviewCount"></span></h2></div><button class="ghost-btn" id="exportBtn">⇩ 导出备份</button></div><div class="plan-board"><div class="section-head compact"><h3>每日计划</h3><label class="plan-total">每日总量<input id="planTotal" type="number" min="1" step="1" value="6" /></label></div><div id="planRows" class="plan-rows"></div><p id="planSummary" class="muted"></p></div><div id="reviewList" class="question-list"></div></section>
-      <section id="insightsView" class="view"><div class="insight-header"><div><p class="eyebrow">LEARNING SIGNALS</p><h2>学习洞察</h2><p class="muted">用错题的轨迹，找到下一步该花时间的地方。</p></div></div><div class="insight-grid"><div class="metric-card"><span>累计错题</span><strong id="metricTotal">0</strong><small>较上周 +4</small></div><div class="metric-card"><span>已掌握</span><strong>42%</strong><small>持续上升中</small></div><div class="metric-card"><span>同步状态</span><strong id="syncStatus">本地</strong><small id="syncHint">未配置云同步</small><button class="ghost-btn sync-btn" id="syncNow">同步</button></div></div></section>
+      <section id="insightsView" class="view"><div class="insight-header"><div><p class="eyebrow">LEARNING SIGNALS</p><h2>学习洞察</h2><p class="muted">用错题的轨迹，找到下一步该花时间的地方。</p></div></div><div class="insight-grid"><div class="metric-card"><span>累计错题</span><strong id="metricTotal">0</strong><small id="metricDelta">本周暂无新增</small></div><div class="metric-card"><span>已掌握</span><strong id="masteryRate">0%</strong><small id="masteryHint">复习≥3次且标记掌握的题</small></div><div class="metric-card"><span>同步状态</span><strong id="syncStatus">本地</strong><small id="syncHint">未配置云同步</small><button class="ghost-btn sync-btn" id="syncNow">同步</button></div></div></section>
       <section id="configView" class="view">
         <div class="insight-header"><div><p class="eyebrow">CONFIGURATION</p><h2>科目配置</h2><p class="muted">先把分类选项搭好，再填单元、知识点和标签。</p></div></div>
         <div class="guide-grid">
