@@ -1,1 +1,55 @@
-{"name":"shiti-kaoyan","version":"1.0.0","description":"本地考研错题本","main":"main.js","scripts":{"start":"electron .","dist":"electron-builder --win portable"},"devDependencies":{"electron":"^31.0.0","electron-builder":"^24.13.3"}}
+{
+  "name": "shiti-kaoyan",
+  "version": "1.1.0",
+  "description": "拾题 · 考研错题本（本地优先，局域网多端同步）",
+  "main": "main.js",
+  "author": "chouyangceng",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --mac dmg --linux",
+    "dist:win": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.shiti.kaoyan",
+    "productName": "拾题考研错题本",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app.js",
+      "index.html",
+      "styles.css",
+      "sw.js",
+      "manifest.webmanifest",
+      "icon.svg"
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icon.png",
+      "category": "Education"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}
