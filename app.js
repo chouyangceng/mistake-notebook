@@ -6,7 +6,7 @@ const now=()=>new Date().toISOString();
 const makeId=()=>crypto.randomUUID?crypto.randomUUID():`id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 let deviceId=localStorage.getItem('shiti-device-id')||makeId();localStorage.setItem('shiti-device-id',deviceId);
 let sync=read('shiti-sync',{endpoint:'',userId:'local',token:'',lastSync:''});sync.deviceId=deviceId;
-const defaultSubjectConfig={数学:['高数','线性代数','概率论'],英语:['错误单词卡片','好词好句','优秀翻译','长难句'],政治:['马原','史纲','毛中特','思修'],专业课:['章节错题','概念辨析','案例分析']};
+const defaultSubjectConfig={数学:['高数','线性代数','概率论'],英语:['错误单词卡片','好词好句','优秀翻译','长难句'],政治:['马原','史纲','毛中特','思修'],专业课:['章节错题','概念辨析','案例分析'],'822控制':['系统建模与方块图','时域分析','稳定性判据','根轨迹','频域分析','校正与设计','状态空间']};
 let subjectConfig=read('shiti-subject-config',defaultSubjectConfig);subjectConfig={...defaultSubjectConfig,...subjectConfig};
 let questions=read('shiti-questions',seed),currentSubject='全部',pendingAttachment=null;
 let editingClassificationId=null;
