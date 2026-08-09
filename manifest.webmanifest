@@ -1,0 +1,18 @@
+{
+  "name": "拾题 · 考研错题本",
+  "short_name": "拾题",
+  "description": "本地优先、可同步的考研错题本",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#2b8a78",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
