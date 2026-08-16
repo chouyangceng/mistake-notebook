@@ -1,0 +1,166 @@
+.exam-generate {
+  min-height: 44px;
+}
+
+.exam-result {
+  display: none;
+  margin-top: 10px;
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.exam-result:not(:empty) {
+  display: block;
+}
+.exam-result.busy {
+  background: #eef2f0;
+  color: #53625c;
+}
+.exam-result.success {
+  background: #e5f2ed;
+  color: #236b45;
+}
+.exam-result.warning {
+  background: #fff5d8;
+  color: #715b1e;
+}
+.exam-result.error {
+  background: #fbeae7;
+  color: #9f2f2f;
+}
+.exam-files button {
+  min-height: 36px;
+  padding: 9px 11px;
+}
+.knowledge-path-selects {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.knowledge-path-selects select {
+  min-height: 44px;
+  width: 100%;
+}
+.taxonomy-card {
+  border: 1px solid #e1e9e5;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fff;
+}
+.taxonomy-card + .taxonomy-card {
+  margin-top: 14px;
+}
+.taxonomy-head,
+.taxonomy-node,
+.type-config {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.taxonomy-head p {
+  margin: 4px 0;
+  color: #6b7771;
+}
+.taxonomy-tree,
+.taxonomy-tree ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.taxonomy-tree ul {
+  margin-left: 20px;
+  padding-left: 14px;
+  border-left: 2px solid #d8e8f8;
+}
+.taxonomy-node {
+  min-height: 48px;
+  margin: 6px 0;
+}
+.taxonomy-actions {
+  display: flex;
+  gap: 8px;
+}
+.taxonomy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.knowledge-pill {
+  color: #245b8c;
+  background: #e9f4ff;
+  border: 1px solid #bcdcff;
+}
+.type-pill {
+  color: #9b3030;
+  background: #fff0f0;
+  border: 1px solid #f3bcbc;
+}
+.compact-pill {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.danger-text,
+.delete-type {
+  min-height: 44px;
+  min-width: 44px;
+  border: 0;
+  background: transparent;
+  color: #b3261e;
+  cursor: pointer;
+  font-weight: 700;
+}
+.type-config {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #edf1ef;
+  align-items: flex-start;
+}
+.type-config > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
+}
+.exam-subject {
+  margin: 12px 0 18px;
+}
+.exam-subject h4 {
+  margin: 0 0 8px;
+}
+.review-scroll-list {
+  padding-bottom: 40vh;
+}
+@media (max-width: 720px) {
+  .taxonomy-head,
+  .taxonomy-node,
+  .type-config {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .taxonomy-actions {
+    width: 100%;
+  }
+  .taxonomy-actions button {
+    flex: 1;
+    min-height: 44px;
+  }
+  .exam-quota-row {
+    gap: 8px;
+  }
+  .exam-quota-row > span {
+    min-width: 0;
+  }
+  .exam-quota-input {
+    width: 72px;
+    min-height: 44px;
+  }
+}
+.text-prompt-modal {
+  max-width: 480px;
+}

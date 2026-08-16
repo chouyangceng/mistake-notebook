@@ -1,0 +1,20 @@
+node_modules/
+release/
+build/
+.mobile-test-data/
+
+android-app/.gradle/
+android-app/.idea/
+android-app/app/build/
+android-app/local.properties
+
+*.apk
+*.exe
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Local agent working notes are not product source.
+AGENT_HANDOFF.md
+DEEPSEEK_REVIEW_PROMPT.md

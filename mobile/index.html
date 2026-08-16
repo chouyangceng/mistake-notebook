@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http:; connect-src 'self' http:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#315b4c" />
+    <title>拾题 · 手机错题本</title>
+    <link rel="stylesheet" href="mobile.css" />
+    <link rel="stylesheet" href="mobile-extra.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <span class="eyebrow">离线优先的考研错题本</span>
+        <h1>拾题</h1>
+      </div>
+      <span id="connectionBadge" class="badge local">仅本机</span>
+    </header>
+    <main>
+      <section class="hero">
+        <p>不连接电脑也能录题、整理、复习和组卷。连接电脑只是可选同步。</p>
+        <div class="stats">
+          <strong id="questionCount">0</strong><span>道本机错题</span>
+        </div>
+      </section>
+
+      <nav class="mobile-nav" aria-label="主要功能">
+        <button class="nav-button active" type="button" data-view="captureView">
+          录题
+        </button>
+        <button class="nav-button" type="button" data-view="libraryView">
+          题库
+        </button>
+        <button class="nav-button" type="button" data-view="paperView">
+          组卷
+        </button>
+        <button class="nav-button" type="button" data-view="settingsView">
+          分类与同步
+        </button>
+      </nav>
+
+      <section id="captureView" class="app-view active">
+        <form class="card" id="questionForm">
+          <div class="section-title">
+            <div>
+              <span class="step">01</span>
+              <h2 id="formTitle">保存一道错题</h2>
+            </div>
+            <button id="cameraBtn" class="text-btn" type="button">
+              选择图片 / PDF
+            </button>
+          </div>
+          <p class="offline-note">
+            保存后立即进入本机题库，退出应用或重启手机后仍会保留。
+          </p>
+          <input
+            id="file"
+            type="file"
+            accept="image/*,.pdf"
+            capture="environment"
+            hidden
+          />
+          <div id="filePreview" class="file-preview empty">
+            尚未选择附件，也可以只录入文字题目
+          </div>
+          <button
+            id="removeFileBtn"
+            class="secondary remove-file hidden"
+            type="button"
+          >
+            移除当前附件
+          </button>
+          <div class="grid two">
+            <label
+              >科目<select name="subject" id="mobileSubject">
+                <option>英语</option>
+                <option selected>数学</option>
+                <option>822控制</option>
+              </select></label
+            >
+            <label
+              >题型<select name="questionType" id="mobileQuestionType"></select
+            ></label>
+          </div>
+          <fieldset class="classification-fieldset">
+            <legend>知识分类</legend>
+            <p class="hint classification-hint">
+              <span class="legend-dot knowledge"></span
+              >蓝色是知识路径，可逐级选择；<span class="legend-dot type"></span
+              >红色题型与知识路径并行。
+            </p>
+            <div id="mobileKnowledgePath" class="knowledge-path-fields"></div>
+            <p
+              id="classificationError"
+              class="field-error"
+              role="alert"
+              aria-live="assertive"
+            ></p>
+          </fieldset>
+          <label
+            >标题<input
+              name="title"
+              required
+              maxlength="120"
+              placeholder="例如：特征值计算易错题"
+          /></label>
+          <label
+            >题目内容 <span class="required-hint">题干或附件至少填写一项</span
+            ><textarea
+              name="question"
+              rows="5"
+              placeholder="可粘贴文字；有截图时可简要描述"
+              aria-describedby="contentError"
+            ></textarea>
+          </label>
+          <p
+            id="contentError"
+            class="field-error"
+            role="alert"
+            aria-live="assertive"
+          ></p>
+          <label
+            >具体知识点
+            <span class="required-hint">与知识分类、题型独立，用逗号分隔</span
+            ><input name="topic" placeholder="特征值, 相似矩阵"
+          /></label>
+          <label
+            >答案 / 解析<textarea
+              name="answer"
+              rows="4"
+              placeholder="也可以稍后在手机或电脑补充"
+            ></textarea>
+          </label>
+          <div class="form-actions">
+            <button id="cancelEditBtn" class="secondary hidden" type="button">
+              取消编辑
+            </button>
+            <button id="submitBtn" class="primary" type="submit">
+              保存到本机题库
+            </button>
+          </div>
+          <div
+            id="message"
+            class="message"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </form>
+      </section>
+
+      <section id="libraryView" class="app-view">
+        <section class="card library-card">
+          <div class="queue-head">
+            <div>
+              <span class="step">02</span>
+              <h2>本机题库</h2>
+              <p>上下滚动复习，不设置熟练度，也不做额外标记。</p>
+            </div>
+            <span id="libraryCount" class="queue-count">0 道</span>
+          </div>
+          <div class="grid two library-filters">
+            <label
+              >筛选科目<select id="librarySubject">
+                <option value="">全部科目</option>
+                <option>英语</option>
+                <option>数学</option>
+                <option>822控制</option>
+              </select></label
+            >
+            <label
+              >搜索<input
+                id="librarySearch"
+                type="search"
+                placeholder="标题、题干或知识点"
+            /></label>
+          </div>
+          <div id="libraryList" class="queue-list">
+            <div class="empty-queue">还没有本机错题</div>
+          </div>
+        </section>
+      </section>
+
+      <section id="paperView" class="app-view">
+        <section class="card paper-card">
+          <div class="queue-head">
+            <div>
+              <span class="step">03</span>
+              <h2>本机智能组卷</h2>
+              <p>仅数学与 822 控制；按知识大类 × 题型分别指定数量。</p>
+            </div>
+            <span id="paperTotal" class="queue-count">0 道</span>
+          </div>
+          <label
+            >组卷科目<select id="paperSubject">
+              <option>数学</option>
+              <option>822控制</option>
+            </select></label
+          >
+          <div id="paperQuotaRows" class="paper-quota-rows"></div>
+          <button id="generatePaperBtn" class="primary" type="button">
+            生成本机复习卷
+          </button>
+        </section>
+        <section id="paperResultCard" class="card hidden">
+          <div class="section-title">
+            <h2>本次复习卷</h2>
+            <button id="clearPaperBtn" class="text-btn" type="button">
+              清空
+            </button>
+          </div>
+          <p id="paperSummary" class="hint"></p>
+          <div id="paperResult" class="paper-result"></div>
+        </section>
+      </section>
+
+      <section id="settingsView" class="app-view">
+        <section class="card config-card">
+          <div class="queue-head">
+            <div>
+              <span class="step">04</span>
+              <h2>分类设置</h2>
+              <p>知识分类可继续加下级或删除；题型是独立维度。</p>
+            </div>
+          </div>
+          <div id="mobileConfigCards" class="config-list"></div>
+        </section>
+        <section class="card" id="connectCard">
+          <div class="queue-head">
+            <div>
+              <h2>可选电脑同步</h2>
+              <p>不填写也不影响本机使用；同步失败不会丢题。</p>
+            </div>
+            <span id="pendingCount" class="queue-count">0 待同步</span>
+          </div>
+          <label for="serverEndpoint">电脑服务地址</label>
+          <input
+            id="serverEndpoint"
+            type="url"
+            inputmode="url"
+            autocomplete="url"
+            placeholder="http://192.168.x.x:17332"
+          />
+          <label for="token">配对令牌</label>
+          <input
+            id="token"
+            type="password"
+            autocomplete="off"
+            placeholder="在 Windows 错题本中查看"
+          />
+          <div class="sync-actions">
+            <button id="connectBtn" class="secondary" type="button">
+              检查连接
+            </button>
+            <button id="uploadAllBtn" class="primary compact" type="button">
+              同步本机变更
+            </button>
+          </div>
+          <button
+            id="importLegacyBtn"
+            class="secondary legacy-import"
+            type="button"
+          >
+            找回旧版待上传箱
+          </button>
+          <p class="hint">
+            连接时会读取电脑端分类与题库；本机有修改的版本优先保留，电脑空数据不会覆盖本机。
+          </p>
+        </section>
+        <section class="card export-card">
+          <div>
+            <h2>本机备份</h2>
+            <p>
+              导出包含本机题目和附件；导入时按更新时间合并，不清空现有题库。
+            </p>
+          </div>
+          <div class="backup-actions">
+            <button id="exportLocalBtn" class="secondary" type="button">
+              导出备份
+            </button>
+            <button id="importLocalBtn" class="secondary" type="button">
+              导入备份
+            </button>
+            <input
+              id="backupFile"
+              type="file"
+              accept="application/json,.json"
+              hidden
+            />
+          </div>
+        </section>
+      </section>
+    </main>
+    <div class="mobile-prompt-backdrop" id="mobileTextPrompt">
+      <form class="mobile-prompt" id="mobileTextPromptForm">
+        <h2 id="mobileTextPromptTitle">请输入名称</h2>
+        <label
+          ><span id="mobileTextPromptHint">名称</span
+          ><input
+            id="mobileTextPromptInput"
+            autocomplete="off"
+            maxlength="80"
+            required
+        /></label>
+        <div class="mobile-prompt-actions">
+          <button id="mobileTextPromptCancel" class="secondary" type="button">
+            取消
+          </button>
+          <button class="primary compact" type="submit">确认</button>
+        </div>
+      </form>
+    </div>
+    <script src="mobile.js" defer></script>
+  </body>
+</html>

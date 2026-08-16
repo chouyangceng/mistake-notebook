@@ -1,148 +1,1448 @@
-const seed=[{id:1,subject:'数学',unit:'线性代数',topic:['特征值','对角化'],title:'矩阵特征值与可对角化条件',question:'设 A 为 3 阶矩阵，已知 A 的特征值为 1, 1, 2。问 A 是否一定可对角化？请说明理由。',answer:'不一定。特征值 1 的代数重数为 2，但其几何重数可能为 1；只有每个特征值的几何重数等于代数重数时才可对角化。',reflection:'看到重根就默认可对角化，忽略了几何重数这个判断条件。',conclusion:'可对角化 ⇔ 对每个特征值，几何重数 = 代数重数。',difficulty:3,date:'今天',revealed:false},{id:2,subject:'英语',unit:'长难句',topic:['定语从句','翻译'],title:'The very idea of... 的语义判断',question:'分析句子中 the very idea of 结构的语气与翻译策略。',answer:'very 在此处意为“正是、恰恰”，强调 idea 本身，而非“非常”。',reflection:'词义选择没有结合上下文语气。',conclusion:'the very + 名词：正是……本身，表示强调。',difficulty:2,date:'昨天',revealed:false},{id:3,subject:'数学',unit:'概率论',topic:['正态分布','参数估计'],title:'正态总体方差的区间估计',question:'设总体 X~N(μ,σ²)，σ²未知时如何构造 μ 的置信区间？',answer:'使用 t 分布： (x̄−μ)/(S/√n) ~ t(n−1)，由此构造双侧置信区间。',reflection:'把 σ 已知时的正态分布分位点直接套用。',conclusion:'小样本、方差未知估计均值 → t 分布。',difficulty:4,date:'8月6日',revealed:false}];
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}};
-const now=()=>new Date().toISOString();
-const makeId=()=>crypto.randomUUID?crypto.randomUUID():`id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-let deviceId=localStorage.getItem('shiti-device-id')||makeId();localStorage.setItem('shiti-device-id',deviceId);
-let sync=read('shiti-sync',{endpoint:'',userId:'local',token:'',lastSync:''});sync.deviceId=deviceId;
-const defaultSubjectConfig={数学:['高数','线性代数','概率论'],英语:['错误单词卡片','好词好句','优秀翻译','长难句'],政治:['马原','史纲','毛中特','思修'],专业课:['章节错题','概念辨析','案例分析'],'822控制':['系统建模与方块图','时域分析','稳定性判据','根轨迹','频域分析','校正与设计','状态空间']};
-let subjectConfig=read('shiti-subject-config',defaultSubjectConfig);subjectConfig={...defaultSubjectConfig,...subjectConfig};
-let questions=read('shiti-questions',seed),currentSubject='全部',pendingAttachment=null;
-let editingClassificationId=null;
-let plan=read('shiti-plan',{dailyTotal:6,rows:{}}),dayPlan=read('shiti-dayplan',{date:'',sig:'',ids:[]}),done=read('shiti-done',{});
-questions=questions.map(normalizeQuestion);
-let syncAddressCache=[];
-const planPresets=[
-  ['数学阶段：高数 10 题',{dailyTotal:10,rows:{'数学|||高数':10}}],
-  ['数学阶段：高数 5 + 线代 5',{dailyTotal:10,rows:{'数学|||高数':5,'数学|||线性代数':5}}],
-  ['英语积累：单词 5 + 好句 3',{dailyTotal:8,rows:{'英语|||错误单词卡片':5,'英语|||好词好句':3}}],
-  ['四科轮转：数英政专',{dailyTotal:12,rows:{'数学|||高数':4,'英语|||错误单词卡片':3,'政治|||马原':2,'专业课|||章节错题':3}}],
-  ['四科均衡：每天 12 题',{dailyTotal:12,rows:{'数学|||高数':3,'英语|||错误单词卡片':3,'政治|||马原':3,'专业课|||章节错题':3}}]
+const seed = [];
+const $ = (s) => document.querySelector(s),
+  $$ = (s) => [...document.querySelectorAll(s)];
+const esc = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (m) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        m
+      ],
+  );
+const read = (k, f) => {
+  try {
+    return JSON.parse(localStorage.getItem(k) || "null") ?? f;
+  } catch {
+    return f;
+  }
+};
+const now = () => new Date().toISOString();
+const makeId = () =>
+  crypto.randomUUID
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+let deviceId = localStorage.getItem("shiti-device-id") || makeId();
+localStorage.setItem("shiti-device-id", deviceId);
+let sync = read("shiti-sync", {
+  endpoint: "",
+  userId: "local",
+  token: "",
+  lastSync: "",
+});
+sync.deviceId = deviceId;
+const {
+  ACTIVE_SUBJECTS,
+  defaults: subjectDefaults,
+  normalizeConfig,
+  normalizePath,
+  findNode,
+  addNode,
+  removeNode,
+} = ShitiTaxonomy;
+const defaultSubjectConfig = subjectDefaults();
+let subjectConfig = normalizeConfig(
+  read("shiti-subject-config", defaultSubjectConfig),
+);
+let questions = read("shiti-questions", seed),
+  currentSubject = "全部",
+  pendingAttachment = null;
+let editingClassificationId = null;
+let textPromptResolver = null;
+let plan = read("shiti-plan", { dailyTotal: 6, rows: {} }),
+  dayPlan = read("shiti-dayplan", { date: "", sig: "", ids: [] }),
+  done = read("shiti-done", {});
+questions = questions.map(normalizeQuestion);
+let syncAddressCache = [];
+const guideFeatures = [
+  [
+    "错题整理",
+    "按科目、知识路径、独立题型、知识点和标签归类，题目与答案分开填。",
+    "已完成",
+  ],
+  [
+    "归类编辑",
+    "卡片里可直接修改知识路径和题型；配置页支持任意层级增删。",
+    "已完成",
+  ],
+  ["滚动复习", "连续浏览全部题目，不记录熟练度，不要求额外标记。", "已完成"],
+  [
+    "本地存储",
+    "题目、分类和同步设置保存在 localStorage，图片/PDF 正文保存在 IndexedDB。",
+    "已完成",
+  ],
+  [
+    "跨端准备",
+    "Windows 主库已内置本地同步接收器，安卓可通过局域网地址把数据推到 Windows。",
+    "进行中",
+  ],
+  [
+    "备份恢复",
+    "一键导出题库、分类、同步设置和附件正文，并可直接导入恢复。",
+    "已完成",
+  ],
 ];
-const guideFeatures=[
-  ['错题整理','按科目、模块、单元、知识点、标签分层，题目、答案、反思、奥技结论分开填。','已完成'],
-  ['归类编辑','卡片里可直接修改题目所属科目、模块、单元和多级标签。','已完成'],
-  ['每日复习','按每日总量 + 科目/模块配额自动排题，优先次数少、到期的旧题。','已完成'],
-  ['本地存储','题目、计划、完成记录在 localStorage，图片/PDF 正文在 IndexedDB。','已完成'],
-  ['跨端准备','Windows 主库已内置本地同步接收器，安卓可通过局域网地址把数据推到 Windows。','进行中'],
-  ['备份恢复','一键导出题库、计划、完成记录和附件正文，并可直接导入恢复。','已完成']
+const guideSteps = [
+  "先录入错题，分别选择知识路径与题型，再填写知识点、题目和答案。",
+  "在「科目配置」中继续添加单元级知识分类，或维护独立题型。",
+  "打开「滚动复习」，从上到下浏览题目和答案即可，不需要熟练度标记。",
+  "数学与 822 控制可在「智能组卷」按知识大类和题型分别设置数量。",
 ];
-const guideSteps=[
-  '先录入错题，尽量把题目、答案、反思、结论写完整。',
-  '在「科目配置」检查四科模块；在「每日计划」里设总量，并给各科 / 模块填配额。',
-  '每天打开「今日复习」，先看题，再按「不会 / 模糊 / 掌握」推进。',
-  'Windows 端先打开主程序，记录它的局域网地址；安卓端把同步地址填成这个地址，再手动同步一次。'
+const guideFlow = [
+  ["入口层", "桌面命令、浏览器、PWA 安装入口"],
+  ["数据层", "localStorage 管题目与分类，IndexedDB 管附件"],
+  ["分类层", "科目、知识分类树、独立题型和知识点"],
+  ["展示层", "错题库、滚动复习、矩阵组卷、学习洞察"],
+  ["同步层", "Windows 内置 HTTP 接收器，安卓/PWA 把变更 POST 到局域网地址"],
 ];
-const guideFlow=[
-  ['入口层','桌面命令、浏览器、PWA 安装入口'],
-  ['数据层','localStorage 管题目/计划，IndexedDB 管附件'],
-  ['计划层','每日总量、科目/模块配额、低复习次数优先、到期题补齐'],
-  ['展示层','错题库、今日复习、学习洞察、使用指引'],
-  ['同步层','Windows 内置 HTTP 接收器，安卓/PWA 把变更 POST 到局域网地址']
+const brainstormIdeas = [
+  ["真正云同步", "后面可再接 Firebase / Supabase / 自建 API"],
+  ["完整备份恢复", "把 IndexedDB 附件一起导出、导入"],
+  ["PDF/OCR 解析", "截图裁题、答案图分开存"],
+  ["编辑删除归档", "清理错题与无用附件"],
+  ["提醒通知", "每天自动提示该复习几题"],
+  ["标签统计", "按错因、题型、知识点聚类"],
 ];
-const brainstormIdeas=[
-  ['真正云同步','后面可再接 Firebase / Supabase / 自建 API'],
-  ['完整备份恢复','把 IndexedDB 附件一起导出、导入'],
-  ['PDF/OCR 解析','截图裁题、答案图分开存'],
-  ['编辑删除归档','清理错题与无用附件'],
-  ['提醒通知','每天自动提示该复习几题'],
-  ['标签统计','按错因、题型、知识点聚类']
+const guideData = [
+  ["shiti-questions", "错题主表，保存题目、答案、分类、标签和附件元数据。"],
+  ["shiti-subject-config", "英语/数学/822控制的知识分类树、题型与组卷开关。"],
+  ["shiti-sync", "同步配置：endpoint / userId / lastSync。"],
+  ["sync-store.json", "Windows 端内置同步接收器保存的最新同步包。"],
+  ["shiti-assets", "IndexedDB 附件正文库。"],
+  [
+    "sync payload",
+    "{ deviceId, sync, subjectConfig, questions, assets }（旧计划字段仅作兼容迁移）",
+  ],
 ];
-const guideData=[
-  ['shiti-questions','错题主表，保存题目、答案、反思、模块、标签、复习历史和附件元数据。'],
-  ['shiti-subject-config','四科模块配置：数学/英语/政治/专业课及各自模块选项。'],
-  ['shiti-plan','每日总量和科目/单元配额。'],
-  ['shiti-dayplan','当天题单快照，避免每次刷新重排。'],
-  ['shiti-done','当天已完成题目记录。'],
-  ['shiti-sync','同步配置：endpoint / userId / lastSync。'],
-  ['sync-store.json','Windows 端内置同步接收器保存的最新同步包。'],
-  ['shiti-assets','IndexedDB 附件正文库。'],
-  ['sync payload','{ deviceId, sync, subjectConfig, questions, plan, done, dayPlan, assets }']
-];
-function today(){let d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){toast('保存失败：本地存储空间不足，请先导出备份');return false}}
-function saveQuestions(){return save('shiti-questions',questions)}
-function savePlan(){dayPlan={date:'',sig:'',ids:[]};save('shiti-plan',plan);save('shiti-dayplan',dayPlan)}
-function saveSubjectConfig(){save('shiti-subject-config',subjectConfig)}
-function normalizeQuestion(q){let module=q.module||q.unit||'未分模块';return {...q,module,unit:q.unit||'未填单元',topic:Array.isArray(q.topic)?q.topic:(q.topic?[q.topic]:[]),tags:Array.isArray(q.tags)?q.tags:[],createdAt:q.createdAt||q.updatedAt||now(),reviewCount:+q.reviewCount||0,reviewHistory:Array.isArray(q.reviewHistory)?q.reviewHistory:[],lastReviewedAt:q.lastReviewedAt||'',userId:q.userId||sync.userId||'local',deviceId:q.deviceId||deviceId,updatedAt:q.updatedAt||now(),version:q.version||1,deletedAt:q.deletedAt||null};}
-function touch(q){q.updatedAt=now();q.deviceId=deviceId;q.userId=sync.userId||'local';q.version=(q.version||0)+1;}
-function subjects(){return [...new Set([...Object.keys(subjectConfig),...questions.map(q=>q.subject)])];}
-function modules(subject){return subjectConfig[subject]||['未分模块'];}
-function splitCSV(v){return String(v??'').split(',').map(s=>s.trim()).filter(Boolean);}
-function fillSubjectSelect(sel,value){if(!sel)return;sel.innerHTML=subjects().map(s=>`<option${s===value?' selected':''}>${esc(s)}</option>`).join('');}
-function fillModuleSelect(sel,subject,value){if(!sel)return;let list=[...modules(subject)];if(value&&!list.includes(value))list=[value,...list];sel.innerHTML=list.map(x=>`<option${x===value?' selected':''}>${esc(x)}</option>`).join('');}
-function db(){return new Promise((ok,fail)=>{let r=indexedDB.open('shiti-assets',1);r.onupgradeneeded=()=>r.result.createObjectStore('files');r.onsuccess=()=>ok(r.result);r.onerror=()=>fail(r.error);});}
-async function putAsset(a){let d=await db();return new Promise((ok,fail)=>{let t=d.transaction('files','readwrite');t.objectStore('files').put(a,a.id);t.oncomplete=()=>{d.close();ok()};t.onerror=()=>fail(t.error);});}
-async function getAsset(id){let d=await db();return new Promise((ok,fail)=>{let r=d.transaction('files').objectStore('files').get(id);r.onsuccess=()=>{d.close();ok(r.result)};r.onerror=()=>fail(r.error);});}
-async function deleteAsset(id){let d=await db();return new Promise((ok,fail)=>{let t=d.transaction('files','readwrite');t.objectStore('files').delete(id);t.oncomplete=()=>{d.close();ok()};t.onerror=()=>fail(t.error);});}
-async function allAssets(){let d=await db();return new Promise((ok,fail)=>{let r=d.transaction('files').objectStore('files').getAll();r.onsuccess=()=>{d.close();ok(r.result)};r.onerror=()=>fail(r.error);});}
-async function clearAssets(){let d=await db();return new Promise((ok,fail)=>{let t=d.transaction('files','readwrite');t.objectStore('files').clear();t.oncomplete=()=>{d.close();ok()};t.onerror=()=>fail(t.error);});}
-function renderSync(){if(!$('#syncStatus'))return;$('#syncStatus').textContent=sync.endpoint?'云同步':'本地';$('#syncHint').textContent=sync.endpoint?`最近同步 ${sync.lastSync?new Date(sync.lastSync).toLocaleString('zh-CN'):'尚未同步'}`:'未配置云同步';}
-function renderSyncAddresses(){let box=$('#syncAddressList');if(!box)return;let copyBtn=$('#copySyncAddress');if(!(globalThis.window&&window.shitiSync&&window.shitiSync.getInfo)){syncAddressCache=[];box.innerHTML='<div class="guide-item"><div><strong>仅 Windows 桌面版可见</strong><p>这里会显示本机可直接复制的同步地址。</p></div></div>';if(copyBtn)copyBtn.onclick=()=>toast('请在 Windows 桌面版中查看同步地址');return;}window.shitiSync.getInfo().then(info=>{let urls=[info?.loopback,...(info?.lanUrls||[])].filter(Boolean);syncAddressCache=urls;box.innerHTML=urls.length?urls.map((u,i)=>`<div class="guide-item"><div><strong>${esc(i===0?'本机回环地址':'局域网地址')}</strong><p>${esc(u)}</p></div></div>`).join(''):'<div class="guide-item"><div><strong>未发现可用地址</strong><p>请确认 Windows 已联网且允许本机同步服务。</p></div></div>';if(copyBtn)copyBtn.onclick=async()=>{let target=syncAddressCache[1]||syncAddressCache[0];if(!target){toast('没有可复制的地址');return;}try{await navigator.clipboard.writeText(target);toast('已复制 Windows 同步地址');}catch{toast('复制失败，请手动选中地址');}};}).catch(()=>{syncAddressCache=[];box.innerHTML='<div class="guide-item"><div><strong>同步地址获取失败</strong><p>请稍后重试，或检查 Windows 桌面版是否已打开。</p></div></div>';if(copyBtn)copyBtn.onclick=()=>toast('同步地址暂不可用');});}
-function renderGuide(){if(!$('#guideView'))return;$('#guideTotal').textContent=questions.length;$('#guideToday').textContent=todayPlan().length;$('#guideSync').textContent=sync.endpoint?'云同步':'本地';$('#guideSyncHint').textContent=sync.endpoint?`最近同步 ${sync.lastSync?new Date(sync.lastSync).toLocaleString('zh-CN'):'尚未同步'}`:'未配置云同步';$('#syncEndpointInput').value=sync.endpoint||'';$('#syncUserInput').value=sync.userId||'local';$('#guideFeatures').innerHTML=guideFeatures.map(([title,desc,status])=>`<div class="guide-item"><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div><span>${esc(status)}</span></div>`).join('');$('#guideSteps').innerHTML=guideSteps.map(step=>`<li>${esc(step)}</li>`).join('');$('#guideFlow').innerHTML=guideFlow.map(([title,desc],i)=>`<div class="flow-item"><span class="flow-index">${i+1}</span><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div></div>`).join('');$('#guideIdeas').innerHTML=brainstormIdeas.map(([title,desc])=>`<div class="guide-item"><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div></div>`).join('');$('#guideData').innerHTML=guideData.map(([key,desc])=>`<div class="guide-item"><div><strong>${esc(key)}</strong><p>${esc(desc)}</p></div></div>`).join('');renderSyncAddresses();}
-function renderConfig(){if(!$('#subjectConfigCards'))return;$('#subjectConfigCards').innerHTML=subjects().map(s=>`<div class="guide-item config-card"><div><strong>${esc(s)}</strong><p>${modules(s).map(m=>`<span class="mini-pill">${esc(m)}</span>`).join('')}</p></div><button class="ghost-btn add-module" data-subject="${esc(s)}">加模块</button></div>`).join('');$('#planPresetList').innerHTML=planPresets.map(([name])=>`<div class="guide-item"><div><strong>${esc(name)}</strong><p>点击后覆盖当前每日配额，可继续手动微调。</p></div><button class="ghost-btn preset-btn" data-preset="${esc(name)}">应用</button></div>`).join('');let tags=[...new Set(['计算错误','审题失误','概念混淆','步骤缺漏','公式不熟','单词拼写','熟词僻义','翻译生硬','选择题陷阱',...questions.flatMap(q=>q.tags||[])])];$('#tagSuggestionPanel').innerHTML=tags.map(t=>`<span class="mini-pill">${esc(t)}</span>`).join('');$$('.add-module').forEach(b=>b.onclick=()=>{let s=b.dataset.subject,m=prompt(`给「${s}」添加模块名称`);if(!m?.trim())return;subjectConfig[s]=[...new Set([...(subjectConfig[s]||[]),m.trim()])];saveSubjectConfig();render();toast('模块已添加');});$$('.preset-btn').forEach(b=>b.onclick=()=>{let p=planPresets.find(x=>x[0]===b.dataset.preset);if(!p)return;plan={dailyTotal:p[1].dailyTotal,rows:{...p[1].rows}};savePlan();render();toast('滚动模板已应用');});}
-function syncPayload(assets=[]){return{deviceId,sync,subjectConfig,questions,plan,done,dayPlan,assets};}
-function mergeQuestions(remote=[]){let map=new Map(questions.map(q=>[String(q.id),q]));remote.forEach(r=>{let local=map.get(String(r.id));if(!local||String(r.updatedAt||'')>String(local.updatedAt||''))map.set(String(r.id),r);});questions=[...map.values()];saveQuestions();}
-async function syncNow(){let endpoint=$('#syncEndpointInput')?.value.trim();let userId=$('#syncUserInput')?.value.trim();let token=$('#syncTokenInput')?.value.trim();if(endpoint){sync.endpoint=endpoint;sync.userId=userId||'local';sync.token=token;save('shiti-sync',sync);renderSync();}if(!sync.endpoint){let fallback=prompt('输入同步服务地址',sync.endpoint||'');if(!fallback)return;sync.endpoint=fallback.trim();save('shiti-sync',sync);renderSync();}try{let assets=await allAssets().catch(()=>[]);let res=await fetch(sync.endpoint,{method:'POST',headers:{'content-type':'application/json','x-shiti-token':sync.token||''},body:JSON.stringify(syncPayload(assets))});if(!res.ok)throw new Error('bad response');let data=await res.json().catch(()=>null);if(data){if(data.subjectConfig)subjectConfig={...defaultSubjectConfig,...subjectConfig,...data.subjectConfig};if(Array.isArray(data.questions))mergeQuestions(data.questions.map(normalizeQuestion));if(data.plan)plan=data.plan;if(data.done)done=data.done;if(data.dayPlan)dayPlan=data.dayPlan;if(data.sync)sync={...sync,...data.sync};if(Array.isArray(data.assets))for(let a of data.assets)await putAsset(a).catch(()=>{});}
-// 推送后立即 GET 拉取服务端完整状态，把其他设备推上来的题目合入本地。
-let pull=await fetch(sync.endpoint,{method:'GET',headers:{'x-shiti-token':sync.token||''}});if(pull.ok){let remote=await pull.json().catch(()=>null);if(remote){if(remote.subjectConfig)subjectConfig={...defaultSubjectConfig,...subjectConfig,...remote.subjectConfig};if(Array.isArray(remote.questions))mergeQuestions(remote.questions.map(normalizeQuestion));if(remote.plan)plan=remote.plan;if(remote.done)done=remote.done;if(remote.dayPlan)dayPlan=remote.dayPlan;if(Array.isArray(remote.assets))for(let a of remote.assets)await putAsset(a).catch(()=>{});}}
-sync.lastSync=now();save('shiti-sync',sync);saveSubjectConfig();saveQuestions();save('shiti-plan',plan);save('shiti-dayplan',dayPlan);save('shiti-done',done);render();toast('同步完成');}catch(e){toast('同步失败，请检查同步地址');}}
-function saveSyncConfig(){sync.endpoint=$('#syncEndpointInput').value.trim();sync.userId=$('#syncUserInput').value.trim()||'local';sync.token=$('#syncTokenInput').value.trim();sync.deviceId=deviceId;save('shiti-sync',sync);render();toast('同步配置已保存');}
-function applyImportedState(data){let assetBag=Array.isArray(data.assets)?[...data.assets]:[];if(data.subjectConfig)subjectConfig={...defaultSubjectConfig,...data.subjectConfig};questions=Array.isArray(data.questions)?data.questions.map(q=>{let attachment=q.attachment||null;if(attachment&&attachment.data){let assetId=attachment.id||`asset-${q.id}`;let safeData=String(attachment.data).startsWith('data:')?attachment.data:'';if(safeData)assetBag.push({id:assetId,name:attachment.name,type:attachment.type,data:safeData});attachment={id:assetId,name:attachment.name,type:attachment.type};}return normalizeQuestion({...q,attachment});}).map(sanitizeImported):questions;plan=data.plan||plan;done=data.done||done;dayPlan=data.dayPlan||{date:'',sig:'',ids:[]};if(data.sync)sync={...sync,...data.sync,deviceId};return assetBag;}
-function sanitizeImported(q){let safe={...q};if(typeof safe.id!=='string')safe.id=String(safe.id);if(!/^[A-Za-z0-9_-]+$/.test(safe.id))safe.id=makeId();for(let key of ['title','question','answer','reflection','conclusion','subject','module','unit'])safe[key]=String(safe[key]??'').slice(0,5000);if(!Array.isArray(safe.topic))safe.topic=[];if(!Array.isArray(safe.tags))safe.tags=[];return safe;}
-async function importBackupFile(file){let raw=await file.text();let data;try{data=JSON.parse(raw)}catch{toast('备份文件不是有效 JSON');return}
-let overwrite=confirm('导入方式：确定=覆盖现有题库；取消=合并导入（保留现有，新增不重复）');
-let assets=applyImportedState(data);
-if(!overwrite){let merged=new Map(questions.map(q=>[String(q.id),q]));let incoming=Array.isArray(data.questions)?data.questions:[];incoming.forEach(q=>{let id=String(q&&q.id||'');if(!id)return;let local=merged.get(id);if(!local||String(q.updatedAt||'')>String(local.updatedAt||''))merged.set(id,normalizeQuestion(q));});questions=[...merged.values()];assets=[];}
-else{await clearAssets().catch(()=>{});}
-for(let a of assets)await putAsset(a).catch(()=>{});saveSubjectConfig();saveQuestions();save('shiti-plan',plan);save('shiti-done',done);save('shiti-dayplan',dayPlan);save('shiti-sync',sync);currentSubject='全部';render();toast(overwrite?'备份已覆盖导入':'备份已合并导入（新增不重复题）');}
-function downloadBackup(){allAssets().then(assets=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({questions,subjectConfig,plan,done,dayPlan,sync,assets},null,2)],{type:'application/json'}));a.download='拾题-错题备份.json';a.click();toast('备份文件已下载');}).catch(()=>toast('导出失败'));}
-function renderNav(){let nav=$('#subjectNav');nav.innerHTML=subjects().map(s=>`<div class="subject-row"><button data-subject="${esc(s)}"><i class="subject-dot"></i>${esc(s)}</button><span class="subject-count">${questions.filter(q=>q.subject===s).length}</span></div>`).join('');$('#totalCount').textContent=questions.length;$('#metricTotal').textContent=questions.length;fillSubjectSelect($('#subjectSelect'),$('#subjectSelect')?.value||subjects()[0]);fillSubjectSelect($('#classificationSubject'),$('#classificationSubject')?.value||subjects()[0]);updateModuleSelect();nav.querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{currentSubject=b.dataset.subject;render();});}
-function updateModuleSelect(selected=''){let s=$('#subjectSelect')?.value||subjects()[0],m=$('#moduleSelect');if(!m)return;fillModuleSelect(m,s,selected);}
-function renderFilters(){let fs=['全部',...subjects()];$('#subjectFilters').innerHTML=fs.map(s=>`<button class="segment ${s===currentSubject?'active':''}" data-filter="${esc(s)}">${esc(s)}</button>`).join('');$$('[data-filter]').forEach(b=>b.onclick=()=>{currentSubject=b.dataset.filter;render();});let units=[...new Set(questions.filter(q=>currentSubject==='全部'||q.subject===currentSubject).flatMap(q=>[q.module,q.unit].filter(Boolean)))];let previous=$('#unitFilter')?.value||'all';$('#unitFilter').innerHTML='<option value="all">全部模块/单元</option>'+units.map(u=>`<option>${esc(u)}</option>`).join('');if(units.includes(previous))$('#unitFilter').value=previous;}
-function planKey(q){return `${q.subject}|||${q.module||q.unit||'未分模块'}`;}
-function planCombos(){let m={};subjects().forEach(s=>(subjectConfig[s]||[]).forEach(module=>{let key=`${s}|||${module}`,count=questions.filter(x=>x.subject===s&&(x.module||x.unit)===module).length;m[key]={key,subject:s,module,count};}));questions.forEach(q=>{let module=q.module||q.unit||'未分模块',key=`${q.subject}|||${module}`;if(!m[key])m[key]={key,subject:q.subject,module,count:questions.filter(x=>x.subject===q.subject&&(x.module||x.unit)===module).length};});return Object.values(m);}
-function planRank(q){let due=!q.nextReview||new Date(q.nextReview)<=new Date(),wait=q.nextReview?Math.max(0,new Date(q.nextReview)-Date.now()):0;return [due?0:1,+q.reviewCount||0,wait,-(q.difficulty||0),q.lastReviewedAt||'',q.id];}
-function planSort(a,b){let x=planRank(a),y=planRank(b);for(let i=0;i<x.length;i++)if(x[i]!==y[i])return x[i]-y[i];return 0;}
-function planSig(){return JSON.stringify({plan,subjectConfig,ids:questions.map(q=>String(q.id)).sort()})}
-function makePlan(){let total=Math.max(1,+plan.dailyTotal||6),pool=[...questions].sort(planSort),picked=new Set(),out=[];let take=(fn,n)=>{for(let q of pool){if(out.length>=total||n<=0)break;if(!picked.has(q.id)&&fn(q)){picked.add(q.id);out.push(q);n--;}}};planCombos().forEach(c=>take(q=>planKey(q)===c.key,+plan.rows[c.key]||0));take(()=>true,total-out.length);return out.map(q=>q.id);}
-function todayPlan(){let t=today(),sig=planSig();if(dayPlan.date!==t||dayPlan.sig!==sig){dayPlan={date:t,sig,ids:makePlan()};save('shiti-dayplan',dayPlan)}return dayPlan.ids.map(id=>questions.find(q=>q.id===id)).filter(q=>q&&!done[t]?.includes(q.id));}
-function planSummary(list){let m={};list.forEach(q=>m[`${q.subject} · ${q.module||q.unit}`]=(m[`${q.subject} · ${q.module||q.unit}`]||0)+1);return Object.entries(m).map(([k,n])=>`${esc(k)} ${n}题`).join('，');}
-function renderPlanEditor(todayList,dueCount){let sum=planCombos().reduce((n,c)=>n+(+plan.rows[c.key]||0),0);$('#planTotal').value=plan.dailyTotal;$('#planRows').innerHTML=planCombos().map(c=>`<label class="plan-row"><span>${esc(c.subject)} · ${esc(c.module)}<small>${c.count}题</small></span><input type="number" min="0" step="1" data-key="${esc(c.key)}" value="${plan.rows[c.key]||0}" /></label>`).join('')||'<div class="no-results">先添加错题，再设置每日配额。</div>';$('#planSummary').innerHTML=todayList.length?`今日剩余 ${todayList.length} 题：${planSummary(todayList)}。到期题 ${dueCount} 道${sum>plan.dailyTotal?'，模块配额已超过每日总量，前面的分类会优先排入。':'，缺口会用低复习次数/高难旧题补齐。'}`:'今天计划已完成。';}
-function render(){renderNav();renderFilters();let unit=$('#unitFilter').value,sort=$('#sortFilter').value;let list=questions.filter(q=>(currentSubject==='全部'||q.subject===currentSubject)&&(unit==='all'||q.unit===unit||q.module===unit));if(sort==='hard')list.sort((a,b)=>b.difficulty-a.difficulty);$('#listHeading').innerHTML=`${esc(currentSubject==='全部'?'全部错题':currentSubject)} <span>${list.length}</span>`;$('#questionList').innerHTML=list.length?list.map(card).join(''):'<div class="no-results">还没有符合条件的错题，点击右上角新建一题吧。</div>';let due=questions.filter(q=>!q.nextReview||new Date(q.nextReview)<=new Date()),todayList=todayPlan();$('#reviewCount').textContent=`${todayList.length} 道剩余 · ${due.length} 道到期`;renderPlanEditor(todayList,due.length);$('#reviewList').innerHTML=todayList.length?todayList.map(card).join(''):'<div class="no-results">今天的复习完成了。明天再来看看。</div>';$('#topicBars').innerHTML=topics().map(([t,n])=>`<div class="topic-bar"><label><span>${esc(t)}</span><span>${n}</span></label><div class="bar-line"><i style="width:${Math.min(100,n*28+16)}%"></i></div></div>`).join('');bindCards();bindPlanControls();loadAttachments();renderSync();renderGuide();renderConfig();renderRealStats();}
-function safeAssetUrl(data){return String(data||'').startsWith('data:')?esc(data):'';}
-function attachment(q){let a=q.attachment;if(!a)return '';if(a.data&&a.type?.startsWith('image/')){let url=safeAssetUrl(a.data);return url?`<div class="attachment-card"><img src="${url}" alt="${esc(a.name)}"></div>`:`<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;}if(a.type?.startsWith('image/'))return `<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;return `<div class="attachment-card"><span>PDF</span><b>${esc(a.name)}</b></div>`;}
-function recordInfo(q){let created=new Date(q.createdAt).toLocaleDateString('zh-CN'),history=q.reviewHistory||[],dates=[...new Set(history.map(x=>x.date||String(x.at||'').slice(0,10)).filter(Boolean))],levels=[q.subject,q.module,q.unit,(q.topic||[]).length&&(q.topic||[]),(q.tags||[]).length&&(q.tags||[])].filter(Boolean).length,labelCount=3+(q.topic||[]).length+(q.tags||[]).length;return{created,dates,levels,labelCount,historyText:dates.length?dates.join('、'):'尚未复习'};}
-function card(q){let r=recordInfo(q);let idAttr=esc(String(q.id));return `<article class="question-card"><div class="q-meta"><span class="tag">${esc(q.subject)}</span><span>${esc(q.module||'未分模块')}</span><span>已复习 ${q.reviewCount||0} 次</span></div><h3>${esc(q.title)}</h3><p class="excerpt">${esc(q.question)}</p>${attachment(q)}<div class="card-foot"><div></div><button class="ghost-btn record-btn" data-id="${idAttr}" aria-expanded="${q.recordOpen?'true':'false'}">${q.recordOpen?'收起学习档案':'查看学习档案'}</button><button class="ghost-btn classify-btn" data-id="${idAttr}">修改归类</button><button class="reveal-btn" data-id="${idAttr}">${q.revealed?'收起答案':'查看答案'}</button><button class="del-btn" data-id="${idAttr}" title="删除这道错题">删除</button></div>${q.recordOpen?`<div class="answer-box"><strong>学习档案</strong><div class="reflection">入库日期：${esc(r.created)}<br>累计复习：${q.reviewCount||0} 次<br>复习日期：${esc(r.historyText)}<br>分类层级：${r.levels} 级<br>标签总数：${r.labelCount} 个</div><div class="topic-pills">${[q.subject,q.module,q.unit,...(q.topic||[]),...((q.tags||[]).map(t=>`#${t}`))].filter(Boolean).map(t=>`<span>${esc(t)}</span>`).join('')}</div></div>`:''}${q.revealed?`<div class="answer-box"><strong>答案与解析</strong>${esc(q.answer)||'暂未填写答案。'}${q.conclusion?`<div class="reflection"><b>奥技 / 结论：</b>${esc(q.conclusion)}</div>`:''}${q.reflection?`<div class="reflection"><b>我的反思：</b>${esc(q.reflection)}</div>`:''}<div class="review-actions"><button data-review="1" data-result="不会" data-id="${idAttr}">标记为不会（1天后复习）</button><button data-review="3" data-result="模糊" data-id="${idAttr}">标记为模糊（3天后复习）</button><button data-review="7" data-result="掌握" data-id="${idAttr}">标记为掌握（7天后复习）</button></div></div>`:''}</article>`;}
-async function loadAttachments(){$$('[data-asset]').forEach(async e=>{let a=await getAsset(e.dataset.asset).catch(()=>null);if(a?.data&&a.type.startsWith('image/')){let url=safeAssetUrl(a.data);if(url)e.innerHTML=`<img src="${url}" alt="${esc(a.name)}">`;}});}
-function bindCards(){
-  $$('.record-btn').forEach(b=>b.onclick=()=>{let q=questions.find(x=>x.id==b.dataset.id);if(!q)return;q.recordOpen=!q.recordOpen;render();});
-  $$('.classify-btn').forEach(b=>b.onclick=()=>openClassificationModal(b.dataset.id));
-  $$('.reveal-btn').forEach(b=>b.onclick=()=>{let q=questions.find(x=>x.id==b.dataset.id);q.revealed=!q.revealed;render();});
-  $$('.del-btn').forEach(b=>b.onclick=()=>{let q=questions.find(x=>x.id==b.dataset.id);if(!q)return;if(!confirm(`确定删除错题「${q.title||q.question}」吗？\n删除后不可恢复。`))return;questions=questions.filter(x=>x.id!=b.dataset.id);for(let k of Object.keys(done))done[k]=(done[k]||[]).filter(id=>id!=b.dataset.id);let at=(q.attachment&&q.attachment.id)||'';if(at)deleteAsset(at).catch(()=>{});dayPlan={date:'',sig:'',ids:[]};saveQuestions();save('shiti-done',done);save('shiti-dayplan',dayPlan);render();toast('错题已删除');});
-  $$('.review-actions button').forEach(b=>b.onclick=()=>{let q=questions.find(x=>x.id==b.dataset.id),days=+b.dataset.review,t=today(),stamp=now();q.nextReview=new Date(Date.now()+days*864e5).toISOString();q.revealed=false;q.reviewCount=(+q.reviewCount||0)+1;q.lastReviewedAt=stamp;q.reviewHistory=[...(q.reviewHistory||[]),{date:t,at:stamp,result:b.dataset.result,afterDays:days,nextReview:q.nextReview}];done[t]=[...new Set([...(done[t]||[]),q.id])];touch(q);saveQuestions();save('shiti-done',done);render();toast(`已记第 ${q.reviewCount} 次复习，${days} 天后再看`);});
+function today() {
+  let d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function bindPlanControls(){
-  $('#planTotal').onchange=e=>{plan.dailyTotal=Math.max(1,+e.target.value||1);savePlan();render();};
-  $$('#planRows input').forEach(i=>i.onchange=e=>{plan.rows[e.target.dataset.key]=Math.max(0,+e.target.value||0);savePlan();render();});
+function askText(title, hint, initialValue = "") {
+  if (textPromptResolver) textPromptResolver(null);
+  $("#textPromptTitle").textContent = title;
+  $("#textPromptHint").textContent = hint;
+  $("#textPromptInput").value = initialValue;
+  $("#textPromptModal").classList.add("show");
+  setTimeout(() => $("#textPromptInput").focus(), 0);
+  return new Promise((resolve) => (textPromptResolver = resolve));
 }
-function topics(){let m={};questions.forEach(q=>[...(q.topic||[]),...(q.tags||[])].forEach(t=>m[t]=(m[t]||0)+1));return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,4);}
-function calendar(){let d=new Date(),year=d.getFullYear(),month=d.getMonth(),first=new Date(year,month,1).getDay(),days=new Date(year,month+1,0).getDate(),todayKey=today(),cells=['日','一','二','三','四','五','六'].map(x=>`<b>${x}</b>`).join('');for(let i=0;i<first;i++)cells+='<span></span>';for(let i=1;i<=days;i++){let key=`${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`,count=(done[key]||[]).length;cells+=`<span class="${count?'done ':''}${key===todayKey?'today':''}" title="${count} 题">${i}</span>`;}$('#calendar').innerHTML=cells;let label=$('#calendar')?.closest('.rail-card')?.querySelector('.muted');if(label)label.textContent=`${year}年${month+1}月`;}
-function openClassificationModal(id){let q=questions.find(x=>String(x.id)===String(id));if(!q)return;editingClassificationId=q.id;fillSubjectSelect($('#classificationSubject'),q.subject||subjects()[0]);$('#classificationSubject').value=q.subject||subjects()[0];fillModuleSelect($('#classificationModule'),$('#classificationSubject').value,q.module||q.unit||'未分模块');$('#classificationUnit').value=q.unit||'';$('#classificationTopic').value=(q.topic||[]).join(', ');$('#classificationTags').value=(q.tags||[]).join(', ');$('#classificationModal').classList.add('show');}
-function closeClassificationModal(){editingClassificationId=null;$('#classificationModal').classList.remove('show');}
-function saveClassificationForm(e){e.preventDefault();let q=questions.find(x=>String(x.id)===String(editingClassificationId));if(!q)return;let f=new FormData(e.target),subject=f.get('subject')||q.subject,module=f.get('module')||'未分模块';q.subject=subject;q.module=module;q.unit=f.get('unit')||'';q.topic=splitCSV(f.get('topic'));q.tags=splitCSV(f.get('tags'));touch(q);dayPlan={date:'',sig:'',ids:[]};saveQuestions();save('shiti-dayplan',dayPlan);closeClassificationModal();render();toast('归类已更新，今日计划已重算');}
-function renderRealStats(){let el=id=>$(id);if(el('#navReviewCount'))el('#navReviewCount').textContent=todayPlan().length;if(el('#todayLabel')){let d=new Date(),weekdays=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'],months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];el('#todayLabel').textContent=`${weekdays[d.getDay()]} · ${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}`;}let t=today(),weekStart=new Date();weekStart.setDate(weekStart.getDate()-weekStart.getDay());let weekKey=[];for(let i=0;i<7;i++){let d=new Date(weekStart);d.setDate(weekStart.getDate()+i);weekKey.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);}let weekDone=weekKey.reduce((n,k)=>n+(done[k]||[]).length,0),todayDone=(done[t]||[]).length;let target=Math.max(1,+plan.dailyTotal||6);let weekTarget=target*7;let progress=Math.min(100,Math.round(weekDone/weekTarget*100));if(el('#weekProgress')){el('#weekProgress').textContent=`${progress}%`;let bar=el('#weekProgressBar');if(bar)bar.style.width=`${progress}%`;}if(el('#weekRemain'))el('#weekRemain').textContent=weekDone?`本周已复习 ${weekDone} 道 · 今日已完成 ${todayDone} 道`:'本周暂无复习记录';if(el('#streakDays')){let streak=0;for(let i=0;i<365;i++){let d=new Date();d.setDate(d.getDate()-i);let key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;if((done[key]||[]).length)streak++;else if(i>0)break;}el('#streakDays').innerHTML=`${streak} <small>天</small>`;}if(el('#metricDelta')){let weekNew=questions.filter(q=>{let c=new Date(q.createdAt);return c>=weekStart&&c<=new Date();}).length;el('#metricDelta').textContent=weekNew?`本周新增 ${weekNew} 道`:'本周暂无新增';}if(el('#masteryRate')){let mastered=questions.filter(q=>(q.reviewCount||0)>=3&&!q.nextReview).length;let rate=questions.length?Math.round(mastered/questions.length*100):0;el('#masteryRate').textContent=`${rate}%`;}}
-function toast(t){let e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200);}
-$('#closeModal').textContent='关闭';$('#closeModal').title='关闭新建错题窗口';$('#closeModal').setAttribute('aria-label','关闭新建错题窗口');
-$$('.nav-item').forEach(b=>b.onclick=()=>{$$('.nav-item').forEach(x=>x.classList.remove('active'));b.classList.add('active');$$('.view').forEach(v=>v.classList.remove('active-view'));$(`#${b.dataset.view}View`).classList.add('active-view');$('#pageTitle').textContent=b.dataset.title||b.textContent.trim();});
-$('#newQuestion').onclick=()=>{$('#modal').classList.add('show');$('#subjectSelect').value=currentSubject!=='全部'?currentSubject:subjects()[0];updateModuleSelect();};$('#closeModal').onclick=()=>$('#modal').classList.remove('show');$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('show')};
-$('#classificationSubject').onchange=()=>fillModuleSelect($('#classificationModule'),$('#classificationSubject').value);
-$('#classificationModal').onclick=e=>{if(e.target.id==='classificationModal')closeClassificationModal();};
-$('#closeClassification').onclick=closeClassificationModal;
-$('#classificationForm').onsubmit=saveClassificationForm;
-$('#questionForm').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),attachment=null;if(pendingAttachment){try{await putAsset(pendingAttachment);attachment={id:pendingAttachment.id,name:pendingAttachment.name,type:pendingAttachment.type};}catch{toast('附件保存失败，已仅保存文字错题');}}let q=normalizeQuestion({id:Date.now(),subject:f.get('subject'),module:f.get('module')||f.get('unit')||'未分模块',unit:f.get('unit'),topic:(f.get('topic')||'未分类').split(',').map(s=>s.trim()).filter(Boolean),tags:(f.get('tags')||'').split(',').map(s=>s.trim()).filter(Boolean),title:f.get('title'),question:f.get('question'),answer:f.get('answer'),reflection:f.get('reflection'),conclusion:f.get('conclusion'),attachment,difficulty:3,date:'刚刚',revealed:false,deletedAt:null});questions.unshift(q);pendingAttachment=null;$('#attachmentPreview').innerHTML='';dayPlan={date:'',sig:'',ids:[]};if(!saveQuestions())return;save('shiti-dayplan',dayPlan);e.target.reset();$('#modal').classList.remove('show');currentSubject='全部';render();toast('错题已保存到本地');};
-$('#subjectSelect').onchange=()=>updateModuleSelect();
-$('#unitFilter').onchange=render;$('#sortFilter').onchange=render;$('#importBtn').onclick=()=>$('#fileInput').click();$('#fileInput').onchange=e=>{let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{pendingAttachment={id:`asset-${Date.now()}`,name:file.name,type:file.type||'application/pdf',data:r.result};$('#attachmentPreview').innerHTML=file.type.startsWith('image/')?`<img src="${r.result}" alt="${esc(file.name)}"><span>${esc(file.name)}</span>`:`<span>PDF 已附加：${esc(file.name)}</span>`;toast(`已附加「${file.name}」`);$('#modal').classList.add('show');};r.readAsDataURL(file);};$('#exportBtn').onclick=downloadBackup;$('#exportBackupBtn').onclick=downloadBackup;$('#focusWeak').onclick=()=>{currentSubject='数学';render();toast('已筛选数学薄弱点');};$('#syncNow').onclick=syncNow;$('#syncNowGuide').onclick=syncNow;$('#saveSyncConfig').onclick=saveSyncConfig;$('#importBackupBtn').onclick=()=>$('#backupFileInput').click();$('#backupFileInput').onchange=e=>{let file=e.target.files[0];if(file)importBackupFile(file).finally(()=>e.target.value='');};if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
-calendar();render();
-setTimeout(()=>{if(globalThis.window?.shitiSync?.getInfo)window.shitiSync.getInfo().then(info=>{if($('#syncTokenInput'))$('#syncTokenInput').value=info.token||'';});},200);
+function closeTextPrompt(value = null) {
+  $("#textPromptModal").classList.remove("show");
+  let resolve = textPromptResolver;
+  textPromptResolver = null;
+  if (resolve) resolve(value);
+}
+function save(k, v) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+    return true;
+  } catch (e) {
+    toast("保存失败：本地存储空间不足，请先导出备份");
+    return false;
+  }
+}
+function saveQuestions() {
+  return save("shiti-questions", questions);
+}
+function saveSubjectConfig() {
+  subjectConfig = normalizeConfig(subjectConfig);
+  save("shiti-subject-config", subjectConfig);
+}
+function normalizeQuestion(q) {
+  let knowledgePath = normalizePath(q.knowledgePath, q.module, q.unit),
+    module = knowledgePath[0] || "未分类",
+    unit = knowledgePath[1] || "";
+  return {
+    ...q,
+    knowledgePath,
+    module,
+    unit,
+    questionType: String(q.questionType || "未分类题型"),
+    topic: Array.isArray(q.topic) ? q.topic : q.topic ? [q.topic] : [],
+    tags: Array.isArray(q.tags) ? q.tags : [],
+    createdAt: q.createdAt || q.updatedAt || now(),
+    reviewCount: +q.reviewCount || 0,
+    reviewHistory: Array.isArray(q.reviewHistory) ? q.reviewHistory : [],
+    lastReviewedAt: q.lastReviewedAt || "",
+    userId: q.userId || sync.userId || "local",
+    deviceId: q.deviceId || deviceId,
+    updatedAt: q.updatedAt || now(),
+    version: q.version || 2,
+    deletedAt: q.deletedAt || null,
+  };
+}
+function touch(q) {
+  q.updatedAt = now();
+  q.deviceId = deviceId;
+  q.userId = sync.userId || "local";
+  q.version = (q.version || 0) + 1;
+}
+function subjects() {
+  return [...ACTIVE_SUBJECTS];
+}
+function questionTypes(subject) {
+  return subjectConfig[subject]?.questionTypes || [];
+}
+function splitCSV(v) {
+  return String(v ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+function fillSubjectSelect(sel, value) {
+  if (!sel) return;
+  sel.innerHTML = subjects()
+    .map((s) => `<option${s === value ? " selected" : ""}>${esc(s)}</option>`)
+    .join("");
+}
+function fillQuestionTypeSelect(sel, subject, value = "") {
+  if (!sel) return;
+  let list = [...questionTypes(subject)];
+  if (value && !list.includes(value)) list = [value, ...list];
+  if (!list.length) list = ["不区分题型"];
+  sel.innerHTML = list
+    .map(
+      (x) =>
+        `<option value="${esc(x)}"${x === value ? " selected" : ""}>${esc(x)}</option>`,
+    )
+    .join("");
+}
+function renderKnowledgePath(container, subject, path = []) {
+  if (!container) return;
+  let tree = subjectConfig[subject]?.knowledgeTree || [],
+    html = "",
+    selected = [];
+  for (let depth = 0; tree.length || path[depth]; depth++) {
+    let legacy =
+        path[depth] && !tree.some((x) => x.name === path[depth])
+          ? { name: path[depth], children: [] }
+          : null,
+      options = legacy ? [legacy, ...tree] : tree,
+      value = path[depth] || (depth === 0 && tree[0] ? tree[0].name : "");
+    html += `<select class="knowledge-level" data-depth="${depth}" aria-label="第 ${depth + 1} 级知识分类"><option value="">${depth ? "不再细分" : "请选择知识大类"}</option>${options.map((x) => `<option${x.name === value ? " selected" : ""}>${esc(x.name)}${legacy === x ? "（旧分类）" : ""}</option>`).join("")}</select>`;
+    if (!value) break;
+    selected.push(value);
+    let configured = findNode(subjectConfig[subject].knowledgeTree, selected);
+    tree =
+      configured?.children ||
+      (path[depth + 1] ? [{ name: path[depth + 1], children: [] }] : []);
+  }
+  container.innerHTML = html;
+  container
+    .querySelectorAll("select")
+    .forEach(
+      (select) =>
+        (select.onchange = () =>
+          renderKnowledgePath(
+            container,
+            subject,
+            readKnowledgePath(container),
+          )),
+    );
+}
+function readKnowledgePath(container) {
+  return [...(container?.querySelectorAll("select") || [])]
+    .map((x) => x.value)
+    .filter(Boolean);
+}
+function db() {
+  return new Promise((ok, fail) => {
+    let r = indexedDB.open("shiti-assets", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("files");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => fail(r.error);
+  });
+}
+async function putAsset(a) {
+  let d = await db();
+  return new Promise((ok, fail) => {
+    let t = d.transaction("files", "readwrite");
+    t.objectStore("files").put(a, a.id);
+    t.oncomplete = () => {
+      d.close();
+      ok();
+    };
+    t.onerror = () => fail(t.error);
+  });
+}
+async function getAsset(id) {
+  let d = await db();
+  return new Promise((ok, fail) => {
+    let r = d.transaction("files").objectStore("files").get(id);
+    r.onsuccess = () => {
+      d.close();
+      ok(r.result);
+    };
+    r.onerror = () => fail(r.error);
+  });
+}
+async function deleteAsset(id) {
+  let d = await db();
+  return new Promise((ok, fail) => {
+    let t = d.transaction("files", "readwrite");
+    t.objectStore("files").delete(id);
+    t.oncomplete = () => {
+      d.close();
+      ok();
+    };
+    t.onerror = () => fail(t.error);
+  });
+}
+async function allAssets() {
+  let d = await db();
+  return new Promise((ok, fail) => {
+    let r = d.transaction("files").objectStore("files").getAll();
+    r.onsuccess = () => {
+      d.close();
+      ok(r.result);
+    };
+    r.onerror = () => fail(r.error);
+  });
+}
+async function clearAssets() {
+  let d = await db();
+  return new Promise((ok, fail) => {
+    let t = d.transaction("files", "readwrite");
+    t.objectStore("files").clear();
+    t.oncomplete = () => {
+      d.close();
+      ok();
+    };
+    t.onerror = () => fail(t.error);
+  });
+}
+function renderSync() {
+  if (!$("#syncStatus")) return;
+  $("#syncStatus").textContent = sync.endpoint ? "云同步" : "本地";
+  $("#syncHint").textContent = sync.endpoint
+    ? `最近同步 ${sync.lastSync ? new Date(sync.lastSync).toLocaleString("zh-CN") : "尚未同步"}`
+    : "未配置云同步";
+}
+function renderSyncAddresses() {
+  let box = $("#syncAddressList");
+  if (!box) return;
+  let copyBtn = $("#copySyncAddress");
+  if (!(globalThis.window && window.shitiSync && window.shitiSync.getInfo)) {
+    syncAddressCache = [];
+    box.innerHTML =
+      '<div class="guide-item"><div><strong>仅 Windows 桌面版可见</strong><p>这里会显示本机可直接复制的同步地址。</p></div></div>';
+    if (copyBtn)
+      copyBtn.onclick = () => toast("请在 Windows 桌面版中查看同步地址");
+    return;
+  }
+  window.shitiSync
+    .getInfo()
+    .then((info) => {
+      let urls = [info?.loopback, ...(info?.lanUrls || [])].filter(Boolean);
+      syncAddressCache = urls;
+      box.innerHTML = urls.length
+        ? urls
+            .map(
+              (u, i) =>
+                `<div class="guide-item"><div><strong>${esc(i === 0 ? "本机回环地址" : "局域网地址")}</strong><p>${esc(u)}</p></div></div>`,
+            )
+            .join("")
+        : '<div class="guide-item"><div><strong>未发现可用地址</strong><p>请确认 Windows 已联网且允许本机同步服务。</p></div></div>';
+      if (copyBtn)
+        copyBtn.onclick = async () => {
+          let target = syncAddressCache[1] || syncAddressCache[0];
+          if (!target) {
+            toast("没有可复制的地址");
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(target);
+            toast("已复制 Windows 同步地址");
+          } catch {
+            toast("复制失败，请手动选中地址");
+          }
+        };
+    })
+    .catch(() => {
+      syncAddressCache = [];
+      box.innerHTML =
+        '<div class="guide-item"><div><strong>同步地址获取失败</strong><p>请稍后重试，或检查 Windows 桌面版是否已打开。</p></div></div>';
+      if (copyBtn) copyBtn.onclick = () => toast("同步地址暂不可用");
+    });
+}
+function renderGuide() {
+  if (!$("#guideView")) return;
+  $("#guideTotal").textContent = questions.length;
+  $("#guideToday").textContent = activeQuestions().length;
+  $("#guideSync").textContent = sync.endpoint ? "云同步" : "本地";
+  $("#guideSyncHint").textContent = sync.endpoint
+    ? `最近同步 ${sync.lastSync ? new Date(sync.lastSync).toLocaleString("zh-CN") : "尚未同步"}`
+    : "未配置云同步";
+  $("#syncEndpointInput").value = sync.endpoint || "";
+  $("#syncUserInput").value = sync.userId || "local";
+  $("#guideFeatures").innerHTML = guideFeatures
+    .map(
+      ([title, desc, status]) =>
+        `<div class="guide-item"><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div><span>${esc(status)}</span></div>`,
+    )
+    .join("");
+  $("#guideSteps").innerHTML = guideSteps
+    .map((step) => `<li>${esc(step)}</li>`)
+    .join("");
+  $("#guideFlow").innerHTML = guideFlow
+    .map(
+      ([title, desc], i) =>
+        `<div class="flow-item"><span class="flow-index">${i + 1}</span><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div></div>`,
+    )
+    .join("");
+  $("#guideIdeas").innerHTML = brainstormIdeas
+    .map(
+      ([title, desc]) =>
+        `<div class="guide-item"><div><strong>${esc(title)}</strong><p>${esc(desc)}</p></div></div>`,
+    )
+    .join("");
+  $("#guideData").innerHTML = guideData
+    .map(
+      ([key, desc]) =>
+        `<div class="guide-item"><div><strong>${esc(key)}</strong><p>${esc(desc)}</p></div></div>`,
+    )
+    .join("");
+  renderSyncAddresses();
+}
+async function renderExamHistory() {
+  let box = $("#examHistory");
+  if (!box || !globalThis.window?.shitiSync?.getExamHistory) return;
+  try {
+    let history = await window.shitiSync.getExamHistory();
+    box.innerHTML = history.length
+      ? history
+          .map(
+            (item) =>
+              `<article class="exam-history-item"><strong>${esc(item.title)}</strong><p>${new Date(item.createdAt).toLocaleString("zh-CN")} · ${item.questionCount} 道${item.missing?.length ? ` · ${item.missing.length} 类题量不足` : ""}</p><div class="exam-files"><button data-exam-file="${esc(item.paperPath)}">打开试卷版</button><button data-exam-file="${esc(item.answerPath)}">打开答案版</button></div></article>`,
+          )
+          .join("")
+      : '<div class="no-results">还没有组卷记录</div>';
+    $$("[data-exam-file]").forEach(
+      (button) =>
+        (button.onclick = () =>
+          window.shitiSync
+            .openExamFile(button.dataset.examFile)
+            .catch(() => toast("PDF 文件已被移动或删除"))),
+    );
+  } catch {
+    box.innerHTML = '<div class="no-results">读取组卷历史失败</div>';
+  }
+}
+function syncPayload(assets = []) {
+  return {
+    deviceId,
+    sync,
+    subjectConfig,
+    questions,
+    plan,
+    done,
+    dayPlan,
+    assets,
+  };
+}
+function mergeQuestions(remote = []) {
+  let map = new Map(questions.map((q) => [String(q.id), q])),
+    changed = false;
+  remote.forEach((r) => {
+    let id = String(r?.id || "");
+    if (!id) return;
+    let local = map.get(id);
+    if (r.deletedAt) {
+      if (local) {
+        map.delete(id);
+        changed = true;
+      }
+      return;
+    }
+    if (!local || String(r.updatedAt || "") > String(local.updatedAt || "")) {
+      map.set(id, r);
+      changed = true;
+    }
+  });
+  questions = [...map.values()];
+  saveQuestions();
+  return changed;
+}
+let desktopPulling = false;
+async function pullDesktopState(silent = true) {
+  if (desktopPulling || !globalThis.window?.shitiSync?.getInfo) return;
+  desktopPulling = true;
+  try {
+    let info = await window.shitiSync.getInfo(),
+      endpoint = String(info?.loopback || "").replace(/\/$/, ""),
+      token = String(info?.token || "");
+    if (!endpoint || !token) return;
+    sync.endpoint = endpoint;
+    sync.token = token;
+    sync.userId = sync.userId || "local";
+    let response = await fetch(endpoint, {
+      headers: { "x-shiti-token": token },
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("desktop pull failed");
+    let remote = await response.json(),
+      changed = false;
+    if (Array.isArray(remote.questions))
+      changed = mergeQuestions(remote.questions.map(normalizeQuestion));
+    if (remote.subjectConfig) {
+      let merged = normalizeConfig({
+        ...subjectConfig,
+        ...remote.subjectConfig,
+      });
+      if (JSON.stringify(merged) !== JSON.stringify(subjectConfig)) {
+        subjectConfig = merged;
+        saveSubjectConfig();
+        changed = true;
+      }
+    }
+    sync.lastSync = now();
+    save("shiti-sync", sync);
+    if ($("#syncTokenInput")) $("#syncTokenInput").value = token;
+    if ($("#syncEndpointInput")) $("#syncEndpointInput").value = endpoint;
+    if (changed) {
+      dayPlan = { date: "", sig: "", ids: [] };
+      save("shiti-dayplan", dayPlan);
+      render();
+      if (!silent) toast("已接收手机上传的错题");
+    } else renderSync();
+  } catch (e) {
+    if (!silent) toast("暂时无法读取 E 盘题库，正在后台重试");
+  } finally {
+    desktopPulling = false;
+  }
+}
+async function syncNow() {
+  let endpoint = $("#syncEndpointInput")?.value.trim();
+  let userId = $("#syncUserInput")?.value.trim();
+  let token = $("#syncTokenInput")?.value.trim();
+  if (endpoint) {
+    sync.endpoint = endpoint;
+    sync.userId = userId || "local";
+    sync.token = token;
+    save("shiti-sync", sync);
+    renderSync();
+  }
+  if (!sync.endpoint) {
+    let fallback = await askText(
+      "输入同步服务地址",
+      "地址",
+      sync.endpoint || "",
+    );
+    if (!fallback) return;
+    sync.endpoint = fallback.trim();
+    save("shiti-sync", sync);
+    renderSync();
+  }
+  try {
+    let assets = await allAssets().catch(() => []);
+    let res = await fetch(sync.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-shiti-token": sync.token || "",
+      },
+      body: JSON.stringify(syncPayload(assets)),
+    });
+    if (!res.ok) throw new Error("bad response");
+    let data = await res.json().catch(() => null);
+    if (data) {
+      if (data.subjectConfig)
+        subjectConfig = normalizeConfig({
+          ...subjectConfig,
+          ...data.subjectConfig,
+        });
+      if (Array.isArray(data.questions))
+        mergeQuestions(data.questions.map(normalizeQuestion));
+      if (data.plan) plan = data.plan;
+      if (data.done) done = data.done;
+      if (data.dayPlan) dayPlan = data.dayPlan;
+      if (data.sync) sync = { ...sync, ...data.sync };
+      if (Array.isArray(data.assets))
+        for (let a of data.assets) await putAsset(a).catch(() => {});
+    }
+    // 推送后立即 GET 拉取服务端完整状态，把其他设备推上来的题目合入本地。
+    let pull = await fetch(sync.endpoint, {
+      method: "GET",
+      headers: { "x-shiti-token": sync.token || "" },
+    });
+    if (pull.ok) {
+      let remote = await pull.json().catch(() => null);
+      if (remote) {
+        if (remote.subjectConfig)
+          subjectConfig = normalizeConfig({
+            ...subjectConfig,
+            ...remote.subjectConfig,
+          });
+        if (Array.isArray(remote.questions))
+          mergeQuestions(remote.questions.map(normalizeQuestion));
+        if (remote.plan) plan = remote.plan;
+        if (remote.done) done = remote.done;
+        if (remote.dayPlan) dayPlan = remote.dayPlan;
+        if (Array.isArray(remote.assets))
+          for (let a of remote.assets) await putAsset(a).catch(() => {});
+      }
+    }
+    sync.lastSync = now();
+    save("shiti-sync", sync);
+    saveSubjectConfig();
+    saveQuestions();
+    save("shiti-plan", plan);
+    save("shiti-dayplan", dayPlan);
+    save("shiti-done", done);
+    render();
+    toast("同步完成");
+  } catch (e) {
+    toast("同步失败，请检查同步地址");
+  }
+}
+function saveSyncConfig() {
+  sync.endpoint = $("#syncEndpointInput").value.trim();
+  sync.userId = $("#syncUserInput").value.trim() || "local";
+  sync.token = $("#syncTokenInput").value.trim();
+  sync.deviceId = deviceId;
+  save("shiti-sync", sync);
+  render();
+  toast("同步配置已保存");
+}
+function applyImportedState(data) {
+  let assetBag = Array.isArray(data.assets) ? [...data.assets] : [];
+  if (data.subjectConfig) subjectConfig = normalizeConfig(data.subjectConfig);
+  questions = Array.isArray(data.questions)
+    ? data.questions
+        .map((q) => {
+          let attachment = q.attachment || null;
+          if (attachment && attachment.data) {
+            let assetId = attachment.id || `asset-${q.id}`;
+            let safeData = String(attachment.data).startsWith("data:")
+              ? attachment.data
+              : "";
+            if (safeData)
+              assetBag.push({
+                id: assetId,
+                name: attachment.name,
+                type: attachment.type,
+                data: safeData,
+              });
+            attachment = {
+              id: assetId,
+              name: attachment.name,
+              type: attachment.type,
+            };
+          }
+          return normalizeQuestion({ ...q, attachment });
+        })
+        .map(sanitizeImported)
+    : questions;
+  plan = data.plan || plan;
+  done = data.done || done;
+  dayPlan = data.dayPlan || { date: "", sig: "", ids: [] };
+  if (data.sync) sync = { ...sync, ...data.sync, deviceId };
+  return assetBag;
+}
+function sanitizeImported(q) {
+  let safe = { ...q };
+  if (typeof safe.id !== "string") safe.id = String(safe.id);
+  if (!/^[A-Za-z0-9_-]+$/.test(safe.id)) safe.id = makeId();
+  for (let key of [
+    "title",
+    "question",
+    "answer",
+    "reflection",
+    "conclusion",
+    "subject",
+    "module",
+    "unit",
+  ])
+    safe[key] = String(safe[key] ?? "").slice(0, 5000);
+  if (!Array.isArray(safe.topic)) safe.topic = [];
+  if (!Array.isArray(safe.tags)) safe.tags = [];
+  return safe;
+}
+async function importBackupFile(file) {
+  let raw = await file.text();
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    toast("备份文件不是有效 JSON");
+    return;
+  }
+  let overwrite = confirm(
+    "导入方式：确定=覆盖现有题库；取消=合并导入（保留现有，新增不重复）",
+  );
+  let assets = applyImportedState(data);
+  if (!overwrite) {
+    let merged = new Map(questions.map((q) => [String(q.id), q]));
+    let incoming = Array.isArray(data.questions) ? data.questions : [];
+    incoming.forEach((q) => {
+      let id = String((q && q.id) || "");
+      if (!id) return;
+      let local = merged.get(id);
+      if (!local || String(q.updatedAt || "") > String(local.updatedAt || ""))
+        merged.set(id, normalizeQuestion(q));
+    });
+    questions = [...merged.values()];
+    assets = [];
+  } else {
+    await clearAssets().catch(() => {});
+  }
+  for (let a of assets) await putAsset(a).catch(() => {});
+  saveSubjectConfig();
+  saveQuestions();
+  save("shiti-plan", plan);
+  save("shiti-done", done);
+  save("shiti-dayplan", dayPlan);
+  save("shiti-sync", sync);
+  currentSubject = "全部";
+  render();
+  toast(overwrite ? "备份已覆盖导入" : "备份已合并导入（新增不重复题）");
+}
+function downloadBackup() {
+  allAssets()
+    .then((assets) => {
+      let a = document.createElement("a");
+      a.href = URL.createObjectURL(
+        new Blob(
+          [
+            JSON.stringify(
+              { questions, subjectConfig, plan, done, dayPlan, sync, assets },
+              null,
+              2,
+            ),
+          ],
+          { type: "application/json" },
+        ),
+      );
+      a.download = "拾题-错题备份.json";
+      a.click();
+      toast("备份文件已下载");
+    })
+    .catch(() => toast("导出失败"));
+}
+function renderFilters() {
+  let fs = ["全部", ...subjects()];
+  $("#subjectFilters").innerHTML = fs
+    .map(
+      (s) =>
+        `<button class="segment ${s === currentSubject ? "active" : ""}" data-filter="${esc(s)}">${esc(s)}</button>`,
+    )
+    .join("");
+  $$("[data-filter]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        currentSubject = b.dataset.filter;
+        render();
+      }),
+  );
+  let units = [
+    ...new Set(
+      questions
+        .filter(
+          (q) => currentSubject === "全部" || q.subject === currentSubject,
+        )
+        .flatMap((q) => [q.module, q.unit].filter(Boolean)),
+    ),
+  ];
+  let previous = $("#unitFilter")?.value || "all";
+  $("#unitFilter").innerHTML =
+    '<option value="all">全部模块/单元</option>' +
+    units.map((u) => `<option>${esc(u)}</option>`).join("");
+  if (units.includes(previous)) $("#unitFilter").value = previous;
+}
+function safeAssetUrl(data) {
+  return String(data || "").startsWith("data:") ? esc(data) : "";
+}
+function attachment(q) {
+  let a = q.attachment;
+  if (!a) return "";
+  if (a.data && a.type?.startsWith("image/")) {
+    let url = safeAssetUrl(a.data);
+    return url
+      ? `<div class="attachment-card"><img src="${url}" alt="${esc(a.name)}"></div>`
+      : `<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;
+  }
+  if (a.type?.startsWith("image/"))
+    return `<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;
+  return `<div class="attachment-card"><span>PDF</span><b>${esc(a.name)}</b></div>`;
+}
+async function loadAttachments() {
+  $$("[data-asset]").forEach(async (e) => {
+    let q = questions.find((x) => x.attachment?.id === e.dataset.asset),
+      meta = q?.attachment || {};
+    let a = await getAsset(e.dataset.asset).catch(() => null);
+    if (a?.data && a.type.startsWith("image/")) {
+      let url = safeAssetUrl(a.data);
+      if (url) e.innerHTML = `<img src="${url}" alt="${esc(a.name)}">`;
+      return;
+    }
+    if (meta.fileName && sync.endpoint && sync.token) {
+      let url = `${sync.endpoint.replace(/\/$/, "")}/attachments/${encodeURIComponent(meta.fileName)}`;
+      try {
+        let res = await fetch(url, {
+          headers: { "x-shiti-token": sync.token },
+        });
+        if (!res.ok) return;
+        let blob = await res.blob(),
+          objectUrl = URL.createObjectURL(blob);
+        if ((meta.type || "").startsWith("image/"))
+          e.innerHTML = `<img src="${objectUrl}" alt="${esc(meta.name || "题目附件")}">`;
+        else
+          e.innerHTML = `<a href="${objectUrl}" target="_blank" rel="noopener">打开 PDF：${esc(meta.name || "附件")}</a>`;
+      } catch {}
+    }
+  });
+}
+function topics() {
+  let m = {};
+  questions.forEach((q) =>
+    [...(q.topic || []), ...(q.tags || [])].forEach(
+      (t) => (m[t] = (m[t] || 0) + 1),
+    ),
+  );
+  return Object.entries(m)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+}
+function calendar() {
+  let d = new Date(),
+    year = d.getFullYear(),
+    month = d.getMonth(),
+    first = new Date(year, month, 1).getDay(),
+    days = new Date(year, month + 1, 0).getDate(),
+    todayKey = today(),
+    cells = ["日", "一", "二", "三", "四", "五", "六"]
+      .map((x) => `<b>${x}</b>`)
+      .join("");
+  for (let i = 0; i < first; i++) cells += "<span></span>";
+  for (let i = 1; i <= days; i++) {
+    let key = `${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`,
+      count = activeQuestions().filter(
+        (question) => String(question.createdAt || "").slice(0, 10) === key,
+      ).length;
+    cells += `<span class="${count ? "done " : ""}${key === todayKey ? "today" : ""}" title="入库 ${count} 题">${i}</span>`;
+  }
+  $("#calendar").innerHTML = cells;
+  let label = $("#calendar")?.closest(".rail-card")?.querySelector(".muted");
+  if (label) label.textContent = `${year}年${month + 1}月`;
+}
+function closeClassificationModal() {
+  editingClassificationId = null;
+  $("#classificationModal").classList.remove("show");
+}
+function activeQuestions() {
+  return questions.filter(
+    (q) => !q.deletedAt && subjects().includes(q.subject),
+  );
+}
+function renderNav() {
+  let active = questions.filter(
+      (q) => !q.deletedAt && subjects().includes(q.subject),
+    ),
+    nav = $("#subjectNav");
+  nav.innerHTML = subjects()
+    .map(
+      (s) =>
+        `<div class="subject-row"><button data-subject="${esc(s)}"><i class="subject-dot"></i>${esc(s)}</button><span class="subject-count">${active.filter((q) => q.subject === s).length}</span></div>`,
+    )
+    .join("");
+  $("#totalCount").textContent = active.length;
+  $("#metricTotal").textContent = active.length;
+  fillSubjectSelect(
+    $("#subjectSelect"),
+    $("#subjectSelect")?.value || subjects()[0],
+  );
+  fillSubjectSelect(
+    $("#classificationSubject"),
+    $("#classificationSubject")?.value || subjects()[0],
+  );
+  updateModuleSelect();
+  nav.querySelectorAll("[data-subject]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        currentSubject = b.dataset.subject;
+        render();
+      }),
+  );
+}
+function updateModuleSelect(path = []) {
+  let subject = $("#subjectSelect")?.value || subjects()[0];
+  fillQuestionTypeSelect($("#questionTypeSelect"), subject, "");
+  renderKnowledgePath(
+    $("#knowledgePathSelects"),
+    subject,
+    Array.isArray(path) ? path : [],
+  );
+}
+function taxonomyNodeHtml(subject, node, path) {
+  let full = [...path, node.name],
+    encoded = encodeURIComponent(JSON.stringify(full));
+  return `<li><div class="taxonomy-node"><span class="taxonomy-pill knowledge-pill">知识 · ${esc(node.name)}</span><span class="taxonomy-actions"><button class="ghost-btn add-child" data-subject="${esc(subject)}" data-path="${encoded}">加下级</button><button class="danger-text delete-node" data-subject="${esc(subject)}" data-path="${encoded}">删除</button></span></div>${node.children?.length ? `<ul>${node.children.map((child) => taxonomyNodeHtml(subject, child, full)).join("")}</ul>` : ""}</li>`;
+}
+function renderConfig() {
+  if (!$("#subjectConfigCards")) return;
+  subjectConfig = normalizeConfig(subjectConfig);
+  $("#subjectConfigCards").innerHTML = subjects()
+    .map((subject) => {
+      let config = subjectConfig[subject];
+      return `<article class="taxonomy-card"><div class="taxonomy-head"><div><strong>${esc(subject)}</strong><p>知识分类可继续分级；题型与知识路径互不从属。</p></div><button class="ghost-btn add-root" data-subject="${esc(subject)}">加知识大类</button></div><ul class="taxonomy-tree">${config.knowledgeTree.map((node) => taxonomyNodeHtml(subject, node, [])).join("") || '<li class="muted">暂无知识分类</li>'}</ul><div class="type-config"><strong>题型</strong><div>${config.questionTypes.map((type) => `<span class="taxonomy-pill type-pill">题型 · ${esc(type)} <button class="delete-type" data-subject="${esc(subject)}" data-type="${esc(type)}" aria-label="删除${esc(type)}">×</button></span>`).join("") || '<span class="muted">该科目不区分题型</span>'}</div><button class="ghost-btn add-type" data-subject="${esc(subject)}">加题型</button></div></article>`;
+    })
+    .join("");
+  let tags = [
+    ...new Set([
+      "计算错误",
+      "审题失误",
+      "概念混淆",
+      "步骤缺漏",
+      "公式不熟",
+      ...questions.flatMap((q) => q.tags || []),
+    ]),
+  ];
+  $("#tagSuggestionPanel").innerHTML = tags
+    .map((t) => `<span class="mini-pill">${esc(t)}</span>`)
+    .join("");
+  $$(".add-root,.add-child").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        let path = b.dataset.path
+            ? JSON.parse(decodeURIComponent(b.dataset.path))
+            : [],
+          name = await askText(
+            "添加知识分类",
+            `归属：${b.dataset.subject}${path.length ? " · " + path.join(" · ") : ""}`,
+          );
+        if (!name?.trim()) return;
+        if (!addNode(subjectConfig, b.dataset.subject, path, name))
+          return toast("名称重复或父级已不存在");
+        saveSubjectConfig();
+        render();
+        toast("知识分类已添加");
+      }),
+  );
+  $$(".delete-node").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let path = JSON.parse(decodeURIComponent(b.dataset.path));
+        if (
+          !confirm(
+            `确定删除知识分类「${path.join(" · ")}」及其所有下级吗？\n已有题目会保留原分类文字。`,
+          )
+        )
+          return;
+        if (removeNode(subjectConfig, b.dataset.subject, path)) {
+          saveSubjectConfig();
+          render();
+          toast("知识分类已删除");
+        }
+      }),
+  );
+  $$(".add-type").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        let name = await askText("添加题型", `科目：${b.dataset.subject}`);
+        if (!name?.trim()) return;
+        let list = subjectConfig[b.dataset.subject].questionTypes;
+        if (list.includes(name.trim())) return toast("该题型已存在");
+        list.push(name.trim());
+        saveSubjectConfig();
+        render();
+        toast("题型已添加");
+      }),
+  );
+  $$(".delete-type").forEach(
+    (b) =>
+      (b.onclick = () => {
+        if (
+          !confirm(
+            `确定删除题型「${b.dataset.type}」吗？\n已有题目仍会保留题型文字。`,
+          )
+        )
+          return;
+        subjectConfig[b.dataset.subject].questionTypes = subjectConfig[
+          b.dataset.subject
+        ].questionTypes.filter((x) => x !== b.dataset.type);
+        saveSubjectConfig();
+        render();
+        toast("题型已删除");
+      }),
+  );
+}
+function examGroups() {
+  subjectConfig = normalizeConfig(subjectConfig);
+  let groups = [];
+  for (const subject of subjects().filter(
+    (x) => subjectConfig[x].examEnabled,
+  )) {
+    for (const node of subjectConfig[subject].knowledgeTree) {
+      for (const questionType of questionTypes(subject)) {
+        let count = questions.filter(
+            (q) =>
+              !q.deletedAt &&
+              q.subject === subject &&
+              q.knowledgePath?.[0] === node.name &&
+              q.questionType === questionType,
+          ).length,
+          key = `${subject}|||${node.name}|||${questionType}`;
+        groups.push({
+          key,
+          subject,
+          knowledge: node.name,
+          questionType,
+          count,
+        });
+      }
+    }
+  }
+  return groups;
+}
+function renderExamBuilder() {
+  let rows = $("#examQuotaRows");
+  if (!rows) return;
+  let previous = {};
+  $$(".exam-quota-input").forEach(
+    (input) => (previous[input.dataset.key] = input.value),
+  );
+  let groups = examGroups(),
+    bySubject = groups.reduce((m, x) => ((m[x.subject] ??= []).push(x), m), {});
+  rows.innerHTML =
+    Object.entries(bySubject)
+      .map(
+        ([subject, items]) =>
+          `<section class="exam-subject"><h4>${esc(subject)}</h4>${items.map((group) => `<label class="exam-quota-row"><span><strong><span class="knowledge-pill compact-pill">${esc(group.knowledge)}</span> <span class="type-pill compact-pill">${esc(group.questionType)}</span></strong><span>可用 ${group.count} 道</span></span><input class="exam-quota-input" data-key="${esc(group.key)}" data-subject="${esc(group.subject)}" data-knowledge="${esc(group.knowledge)}" data-question-type="${esc(group.questionType)}" type="number" min="0" max="100" value="${esc(previous[group.key] || 0)}" aria-label="${esc(group.subject + group.knowledge + group.questionType + "题数")}" /></label>`).join("")}</section>`,
+      )
+      .join("") ||
+    '<div class="no-results">请先配置数学或 822 控制的分类与题型</div>';
+  let update = () => {
+    $("#examTotal").textContent =
+      `共 ${$$(".exam-quota-input").reduce((sum, input) => sum + (+input.value || 0), 0)} 道`;
+  };
+  $$(".exam-quota-input").forEach((input) => (input.oninput = update));
+  update();
+  renderExamHistory();
+}
+async function generateExamFromUi() {
+  if (!globalThis.window?.shitiSync?.generateExam) {
+    toast("智能组卷仅支持 Windows 桌面版");
+    return;
+  }
+  let title = $("#examTitle").value.trim() || `错题复习卷-${today()}`,
+    quotas = $$(".exam-quota-input")
+      .map((input) => ({
+        subject: input.dataset.subject,
+        knowledge: input.dataset.knowledge,
+        questionType: input.dataset.questionType,
+        count: Math.max(0, +input.value || 0),
+      }))
+      .filter((item) => item.count),
+    resultBox = $("#examResult");
+  if (!quotas.length) {
+    resultBox.textContent = "请至少给一个“知识分类 × 题型”填写题数。";
+    resultBox.className = "exam-result error";
+    toast("请至少填写一个题量");
+    return;
+  }
+  let button = $("#generateExam");
+  button.disabled = true;
+  button.textContent = "正在排版两份 PDF…";
+  try {
+    let result = await window.shitiSync.generateExam({ title, quotas });
+    let notes =
+      result.missing?.map(
+        (x) =>
+          `${x.subject}·${x.knowledge}·${x.questionType}缺 ${x.requested - x.available} 道`,
+      ) || [];
+    resultBox.textContent = `已生成 ${result.questionCount} 道题${notes.length ? "；" + notes.join("，") : ""}`;
+    resultBox.className = `exam-result ${notes.length ? "warning" : "success"}`;
+    toast(`已生成 ${result.questionCount} 道题的两份 PDF`);
+    await renderExamHistory();
+  } catch (error) {
+    resultBox.textContent = `组卷失败：${error.message || "请稍后重试"}`;
+    resultBox.className = "exam-result error";
+    toast("组卷失败");
+  } finally {
+    button.disabled = false;
+    button.textContent = "生成试卷版 + 答案版 PDF";
+  }
+}
+function recordInfo(q) {
+  let created = new Date(q.createdAt).toLocaleDateString("zh-CN"),
+    levels =
+      1 +
+      (q.knowledgePath || []).length +
+      (q.questionType && q.questionType !== "未分类题型" ? 1 : 0) +
+      (q.topic || []).length;
+  return {
+    created,
+    levels,
+    labelCount: (q.topic || []).length + (q.tags || []).length,
+  };
+}
+function card(q) {
+  let r = recordInfo(q),
+    idAttr = esc(String(q.id)),
+    path = (q.knowledgePath || []).join(" › ");
+  return `<article class="question-card"><div class="q-meta"><span class="tag">${esc(q.subject)}</span><span class="knowledge-pill compact-pill">知识 · ${esc(path || "未分类")}</span>${q.questionType && q.questionType !== "不区分题型" ? `<span class="type-pill compact-pill">题型 · ${esc(q.questionType)}</span>` : ""}</div><h3>${esc(q.title)}</h3><p class="excerpt">${esc(q.question)}</p>${attachment(q)}<div class="card-foot"><div></div><button class="ghost-btn record-btn" data-id="${idAttr}" aria-expanded="${q.recordOpen ? "true" : "false"}">${q.recordOpen ? "收起档案" : "查看档案"}</button><button class="ghost-btn classify-btn" data-id="${idAttr}">修改归类</button><button class="reveal-btn" data-id="${idAttr}">${q.revealed ? "收起答案" : "查看答案"}</button><button class="del-btn" data-id="${idAttr}" title="删除这道错题">删除</button></div>${
+    q.recordOpen
+      ? `<div class="answer-box"><strong>题目档案</strong><div class="reflection">入库日期：${esc(r.created)}<br>分类层级：${r.levels} 级<br>标签总数：${r.labelCount} 个</div><div class="topic-pills">${[
+          q.subject,
+          ...(q.knowledgePath || []),
+          q.questionType,
+          ...(q.topic || []),
+          ...(q.tags || []).map((t) => `#${t}`),
+        ]
+          .filter(Boolean)
+          .map((t) => `<span>${esc(t)}</span>`)
+          .join("")}</div></div>`
+      : ""
+  }${q.revealed ? `<div class="answer-box"><strong>答案与解析</strong>${esc(q.answer) || "暂未填写答案。"}${q.conclusion ? `<div class="reflection"><b>奥技 / 结论：</b>${esc(q.conclusion)}</div>` : ""}${q.reflection ? `<div class="reflection"><b>我的反思：</b>${esc(q.reflection)}</div>` : ""}</div>` : ""}</article>`;
+}
+function bindCards() {
+  $$(".record-btn").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let q = questions.find((x) => x.id == b.dataset.id);
+        if (q) {
+          q.recordOpen = !q.recordOpen;
+          render();
+        }
+      }),
+  );
+  $$(".classify-btn").forEach(
+    (b) => (b.onclick = () => openClassificationModal(b.dataset.id)),
+  );
+  $$(".reveal-btn").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let q = questions.find((x) => x.id == b.dataset.id);
+        if (q) {
+          q.revealed = !q.revealed;
+          render();
+        }
+      }),
+  );
+  $$(".del-btn").forEach(
+    (b) => (b.onclick = () => deleteQuestion(b.dataset.id)),
+  );
+}
+async function deleteQuestion(questionId) {
+  let q = questions.find((x) => String(x.id) === String(questionId));
+  if (
+    !q ||
+    !confirm(
+      `确定彻底删除错题「${q.title || q.question}」吗？\n删除会同步到 E 盘和其他设备。`,
+    )
+  )
+    return;
+  let id = String(q.id),
+    stamp = now(),
+    endpoint = "",
+    token = "";
+  try {
+    if (globalThis.window?.shitiSync?.getInfo) {
+      let info = await window.shitiSync.getInfo();
+      endpoint = String(info?.loopback || "").replace(/\/$/, "");
+      token = String(info?.token || "");
+    } else {
+      endpoint = String(sync.endpoint || "").replace(/\/$/, "");
+      token = String(sync.token || "");
+    }
+    if (endpoint) {
+      let response = await fetch(
+        `${endpoint}/api/questions/${encodeURIComponent(id)}`,
+        { method: "DELETE", headers: { "x-shiti-token": token } },
+      );
+      if (!response.ok && response.status !== 404)
+        throw new Error(`HTTP ${response.status}`);
+    }
+  } catch {
+    toast("E 盘删除失败，题目未删除，请重试");
+    return;
+  }
+  q.deletedAt = stamp;
+  q.updatedAt = stamp;
+  q.version = (+q.version || 0) + 1;
+  q.deviceId = deviceId;
+  q.userId = sync.userId || "local";
+  q.revealed = false;
+  for (let key of Object.keys(done))
+    done[key] = (done[key] || []).filter((itemId) => String(itemId) !== id);
+  if (q.attachment?.id) deleteAsset(q.attachment.id).catch(() => {});
+  saveQuestions();
+  save("shiti-done", done);
+  render();
+  toast(
+    endpoint
+      ? "已从本机、E 盘和同步题库删除"
+      : "已标记删除，联网后会同步到 E 盘",
+  );
+}
+function openClassificationModal(id) {
+  let q = questions.find((x) => String(x.id) === String(id));
+  if (!q) return;
+  editingClassificationId = q.id;
+  fillSubjectSelect($("#classificationSubject"), q.subject);
+  fillQuestionTypeSelect(
+    $("#classificationQuestionType"),
+    q.subject,
+    q.questionType,
+  );
+  renderKnowledgePath(
+    $("#classificationKnowledgePath"),
+    q.subject,
+    q.knowledgePath,
+  );
+  $("#classificationTopic").value = (q.topic || []).join(", ");
+  $("#classificationTags").value = (q.tags || []).join(", ");
+  $("#classificationModal").classList.add("show");
+}
+function saveClassificationForm(e) {
+  e.preventDefault();
+  let q = questions.find(
+    (x) => String(x.id) === String(editingClassificationId),
+  );
+  if (!q) return;
+  let f = new FormData(e.target),
+    path = readKnowledgePath($("#classificationKnowledgePath"));
+  q.subject = f.get("subject") || q.subject;
+  q.knowledgePath = path.length ? path : ["未分类"];
+  q.module = q.knowledgePath[0];
+  q.unit = q.knowledgePath[1] || "";
+  q.questionType = f.get("questionType") || "未分类题型";
+  q.topic = splitCSV(f.get("topic"));
+  q.tags = splitCSV(f.get("tags"));
+  touch(q);
+  saveQuestions();
+  closeClassificationModal();
+  render();
+  toast("归类已更新");
+}
+function renderRealStats() {
+  let active = activeQuestions();
+  let classifications = new Set(
+    active.map((q) => `${q.subject}|||${q.knowledgePath?.[0] || "未分类"}`),
+  );
+  if ($("#navReviewCount")) $("#navReviewCount").textContent = active.length;
+  if ($("#masteryRate")) $("#masteryRate").textContent = classifications.size;
+  if ($("#streakDays"))
+    $("#streakDays").innerHTML = `${classifications.size} <small>类</small>`;
+  if ($("#todayLabel"))
+    $("#todayLabel").textContent = new Date().toLocaleDateString("zh-CN", {
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    });
+  let start = new Date();
+  start.setDate(start.getDate() - 7);
+  let recent = active.filter((q) => new Date(q.createdAt) >= start).length,
+    recentRatio = active.length
+      ? Math.round((recent / active.length) * 100)
+      : 0;
+  if ($("#weekProgress")) $("#weekProgress").textContent = `${recent} 道`;
+  if ($("#weekProgressBar"))
+    $("#weekProgressBar").style.width = `${recentRatio}%`;
+  if ($("#weekRemain"))
+    $("#weekRemain").textContent = recent
+      ? `占当前题库 ${recentRatio}%`
+      : "近 7 天暂无新增";
+  if ($("#metricDelta")) {
+    $("#metricDelta").textContent = recent
+      ? `近 7 天新增 ${recent} 道`
+      : "近 7 天暂无新增";
+  }
+  let focus = new Map();
+  active.forEach((q) => {
+    let label = [q.subject, q.knowledgePath?.[0], q.topic?.[0]]
+      .filter(Boolean)
+      .join(" · ");
+    if (label) focus.set(label, (focus.get(label) || 0) + 1);
+  });
+  let [focusLabel, focusCount] =
+    [...focus.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  if ($("#weakSummary"))
+    $("#weakSummary").textContent = focusLabel
+      ? `当前最集中在「${focusLabel}」，共 ${focusCount} 道。`
+      : "录入错题后，这里会显示最集中的分类。";
+  if ($("#focusWeak"))
+    $("#focusWeak").dataset.subject = focusLabel?.split(" · ")[0] || "全部";
+  calendar();
+}
+function render() {
+  let active = questions.filter(
+    (q) => !q.deletedAt && subjects().includes(q.subject),
+  );
+  renderNav();
+  renderFilters();
+  let unit = $("#unitFilter")?.value || "all",
+    sort = $("#sortFilter")?.value || "recent";
+  let list = active.filter(
+    (q) =>
+      (currentSubject === "全部" || q.subject === currentSubject) &&
+      (unit === "all" || q.knowledgePath?.includes(unit)),
+  );
+  if (sort === "hard")
+    list.sort((a, b) => (b.difficulty || 0) - (a.difficulty || 0));
+  $("#listHeading").innerHTML =
+    `${esc(currentSubject === "全部" ? "全部错题" : currentSubject)} <span>${list.length}</span>`;
+  $("#questionList").innerHTML = list.length
+    ? list.map(card).join("")
+    : '<div class="no-results">还没有符合条件的错题，点击右上角新建一题吧。</div>';
+  $("#reviewCount").textContent = `${active.length} 道`;
+  $("#reviewList").innerHTML = active.length
+    ? active.map(card).join("")
+    : '<div class="no-results">题库为空，先录入错题再来滚动复习。</div>';
+  $("#topicBars").innerHTML = topics()
+    .map(
+      ([t, n]) =>
+        `<div class="topic-bar"><label><span>${esc(t)}</span><span>${n}</span></label><div class="bar-line"><i style="width:${Math.min(100, n * 28 + 16)}%"></i></div></div>`,
+    )
+    .join("");
+  bindCards();
+  loadAttachments();
+  renderSync();
+  renderGuide();
+  renderConfig();
+  renderExamBuilder();
+  renderRealStats();
+}
+function toast(t) {
+  let e = $("#toast");
+  e.textContent = t;
+  e.classList.add("show");
+  setTimeout(() => e.classList.remove("show"), 2200);
+}
+$("#closeModal").textContent = "关闭";
+$("#closeModal").title = "关闭新建错题窗口";
+$("#closeModal").setAttribute("aria-label", "关闭新建错题窗口");
+$$(".nav-item").forEach(
+  (b) =>
+    (b.onclick = () => {
+      $$(".nav-item").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      $$(".view").forEach((v) => v.classList.remove("active-view"));
+      $(`#${b.dataset.view}View`).classList.add("active-view");
+      $("#pageTitle").textContent = b.dataset.title || b.textContent.trim();
+    }),
+);
+$("#newQuestion").onclick = () => {
+  $("#modal").classList.add("show");
+  $("#subjectSelect").value =
+    currentSubject !== "全部" && subjects().includes(currentSubject)
+      ? currentSubject
+      : subjects()[0];
+  updateModuleSelect();
+};
+$("#closeModal").onclick = () => $("#modal").classList.remove("show");
+$("#modal").onclick = (e) => {
+  if (e.target.id === "modal") $("#modal").classList.remove("show");
+};
+$("#classificationSubject").onchange = () => {
+  let subject = $("#classificationSubject").value;
+  fillQuestionTypeSelect($("#classificationQuestionType"), subject);
+  renderKnowledgePath($("#classificationKnowledgePath"), subject, []);
+};
+$("#classificationModal").onclick = (e) => {
+  if (e.target.id === "classificationModal") closeClassificationModal();
+};
+$("#closeClassification").onclick = closeClassificationModal;
+$("#closeTextPrompt").onclick = () => closeTextPrompt();
+$("#cancelTextPrompt").onclick = () => closeTextPrompt();
+$("#textPromptForm").onsubmit = (event) => {
+  event.preventDefault();
+  closeTextPrompt($("#textPromptInput").value.trim());
+};
+$("#classificationForm").onsubmit = saveClassificationForm;
+$("#questionForm").onsubmit = async (e) => {
+  e.preventDefault();
+  let f = new FormData(e.target),
+    attachment = null,
+    path = readKnowledgePath($("#knowledgePathSelects"));
+  if (!path.length) {
+    toast("请至少选择一个知识大类");
+    return;
+  }
+  if (pendingAttachment) {
+    try {
+      await putAsset(pendingAttachment);
+      attachment = {
+        id: pendingAttachment.id,
+        name: pendingAttachment.name,
+        type: pendingAttachment.type,
+      };
+    } catch {
+      toast("附件保存失败，已仅保存文字错题");
+    }
+  }
+  let q = normalizeQuestion({
+    id: Date.now(),
+    subject: f.get("subject"),
+    knowledgePath: path,
+    questionType: f.get("questionType") || "未分类题型",
+    topic: splitCSV(f.get("topic") || "未分类"),
+    tags: splitCSV(f.get("tags")),
+    title: f.get("title"),
+    question: f.get("question"),
+    answer: f.get("answer"),
+    reflection: f.get("reflection"),
+    conclusion: f.get("conclusion"),
+    attachment,
+    difficulty: 3,
+    date: "刚刚",
+    revealed: false,
+    deletedAt: null,
+  });
+  questions.unshift(q);
+  pendingAttachment = null;
+  $("#attachmentPreview").innerHTML = "";
+  if (!saveQuestions()) return;
+  e.target.reset();
+  $("#modal").classList.remove("show");
+  currentSubject = "全部";
+  render();
+  toast("错题已保存到本地");
+};
+$("#subjectSelect").onchange = () => updateModuleSelect();
+$("#unitFilter").onchange = render;
+$("#sortFilter").onchange = render;
+$("#importBtn").onclick = () => $("#fileInput").click();
+$("#fileInput").onchange = (e) => {
+  let file = e.target.files[0];
+  if (!file) return;
+  let r = new FileReader();
+  r.onload = () => {
+    pendingAttachment = {
+      id: `asset-${Date.now()}`,
+      name: file.name,
+      type: file.type || "application/pdf",
+      data: r.result,
+    };
+    $("#attachmentPreview").innerHTML = file.type.startsWith("image/")
+      ? `<img src="${r.result}" alt="${esc(file.name)}"><span>${esc(file.name)}</span>`
+      : `<span>PDF 已附加：${esc(file.name)}</span>`;
+    toast(`已附加「${file.name}」`);
+    $("#modal").classList.add("show");
+  };
+  r.readAsDataURL(file);
+};
+$("#exportBtn").onclick = downloadBackup;
+$("#exportBackupBtn").onclick = downloadBackup;
+$("#focusWeak").onclick = () => {
+  currentSubject = $("#focusWeak").dataset.subject || "全部";
+  render();
+  toast(
+    currentSubject === "全部" ? "暂无可筛选错题" : `已筛选${currentSubject}`,
+  );
+};
+$("#syncNow").onclick = syncNow;
+$("#syncNowGuide").onclick = syncNow;
+$("#saveSyncConfig").onclick = saveSyncConfig;
+$("#importBackupBtn").onclick = () => $("#backupFileInput").click();
+$("#backupFileInput").onchange = (e) => {
+  let file = e.target.files[0];
+  if (file) importBackupFile(file).finally(() => (e.target.value = ""));
+};
+if ("serviceWorker" in navigator && location.protocol !== "file:")
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+$("#generateExam").onclick = generateExamFromUi;
+$("#refreshExamHistory").onclick = renderExamHistory;
+render();
+setTimeout(() => pullDesktopState(false), 200);
+setInterval(() => pullDesktopState(true), 5000);

@@ -1,111 +1,523 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#2b8a78" />
-  <title>拾题 · 考研错题本</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icon.svg" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">拾</div><div><strong>拾题</strong><span>考研错题本</span></div></div>
-      <div class="nav-label">工作台</div>
-      <button class="nav-item active" data-view="library" data-title="错题库"><span>▦</span>错题库 <em id="totalCount">0</em></button>
-      <button class="nav-item" data-view="review" data-title="今日复习"><span>◷</span>今日复习 <em id="navReviewCount">0</em></button>
-      <button class="nav-item" data-view="insights" data-title="学习洞察"><span>⌁</span>学习洞察</button>
-      <button class="nav-item" data-view="config" data-title="科目配置"><span>⚙</span>科目配置</button>
-      <button class="nav-item" data-view="guide" data-title="使用指引"><span>☰</span>使用指引</button>
-      <div class="nav-label subjects-label">我的科目</div>
-      <div id="subjectNav"></div>
-      <button class="add-subject" id="addSubject">＋ 添加科目</button>
-      <div class="sidebar-bottom"><div class="streak"><span>连续学习</span><strong id="streakDays">0 <small>天</small></strong><i>↗</i></div><button class="settings">⚙ 设置</button></div>
-    </aside>
-    <main class="main">
-      <header class="topbar"><div><p class="eyebrow" id="todayLabel">TODAY</p><h1 id="pageTitle">错题库</h1></div><div class="top-actions"><button class="icon-btn" title="搜索错题" aria-label="搜索错题">搜索</button><button class="primary-btn" id="newQuestion">新建错题</button><div class="avatar">林</div></div></header>
-      <section id="libraryView" class="view active-view">
-        <div class="overview-row"><div><p class="muted">把做错的题，变成下一次做对的底气。</p></div><div class="progress-card"><div><span>本周复习进度</span><strong id="weekProgress">0%</strong></div><div class="progress-track"><i id="weekProgressBar" style="width:0%"></i></div><small id="weekRemain">本周暂无复习记录</small></div></div>
-        <div class="filters"><div class="segmented" id="subjectFilters"></div><div class="filter-right"><select id="unitFilter" aria-label="按模块或单元筛选"><option value="all">全部单元</option></select><select id="sortFilter" aria-label="错题排序方式"><option value="recent">最近添加</option><option value="hard">难度优先</option></select><button class="view-toggle active" title="卡片视图" aria-label="切换到卡片视图">卡片视图</button><button class="view-toggle" title="紧凑视图" aria-label="切换到紧凑视图">紧凑视图</button></div></div>
-        <div class="content-grid"><div><div class="section-head"><h2 id="listHeading">全部错题 <span id="listCount">0</span></h2><button class="ghost-btn" id="importBtn">⇧ 导入 PDF 截图</button><input id="fileInput" type="file" accept="image/*,.pdf" hidden /></div><div id="questionList" class="question-list"></div></div><aside class="right-rail"><div class="rail-card accent-card"><div class="rail-icon">↯</div><div><strong>掌握你的薄弱点</strong><p>最近错题集中在「线性代数 · 特征值」</p><button id="focusWeak">查看专项练习 →</button></div></div><div class="rail-card"><div class="section-head compact"><h3>知识点分布</h3><span class="muted">本月</span></div><div id="topicBars"></div></div><div class="rail-card"><div class="section-head compact"><h3>复习日历</h3><span class="muted">2026年8月</span></div><div class="calendar" id="calendar"></div></div></aside></div>
-      </section>
-      <section id="reviewView" class="view"><div class="section-head"><div><p class="eyebrow">SPACED REVIEW</p><h2>今日复习 <span id="reviewCount"></span></h2></div><button class="ghost-btn" id="exportBtn">⇩ 导出备份</button></div><div class="plan-board"><div class="section-head compact"><h3>每日计划</h3><label class="plan-total">每日总量<input id="planTotal" type="number" min="1" step="1" value="6" /></label></div><div id="planRows" class="plan-rows"></div><p id="planSummary" class="muted"></p></div><div id="reviewList" class="question-list"></div></section>
-      <section id="insightsView" class="view"><div class="insight-header"><div><p class="eyebrow">LEARNING SIGNALS</p><h2>学习洞察</h2><p class="muted">用错题的轨迹，找到下一步该花时间的地方。</p></div></div><div class="insight-grid"><div class="metric-card"><span>累计错题</span><strong id="metricTotal">0</strong><small id="metricDelta">本周暂无新增</small></div><div class="metric-card"><span>已掌握</span><strong id="masteryRate">0%</strong><small id="masteryHint">复习≥3次且标记掌握的题</small></div><div class="metric-card"><span>同步状态</span><strong id="syncStatus">本地</strong><small id="syncHint">未配置云同步</small><button class="ghost-btn sync-btn" id="syncNow">同步</button></div></div></section>
-      <section id="configView" class="view">
-        <div class="insight-header"><div><p class="eyebrow">CONFIGURATION</p><h2>科目配置</h2><p class="muted">先把分类选项搭好，再填单元、知识点和标签。</p></div></div>
-        <div class="guide-grid">
-          <div class="rail-card">
-            <div class="section-head compact"><h3>模块选项</h3><span class="muted">四科</span></div>
-            <div id="subjectConfigCards" class="guide-list"></div>
-          </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>滚动模板</h3><span class="muted">每日配额</span></div>
-            <div id="planPresetList" class="guide-list"></div>
-          </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>标签建议</h3><span class="muted">可选</span></div>
-            <div id="tagSuggestionPanel" class="guide-list"></div>
-          </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http:; connect-src 'self' http:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2b8a78" />
+    <title>拾题 · 考研错题本</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-extra.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">拾</div>
+          <div><strong>拾题</strong><span>考研错题本</span></div>
         </div>
-      </section>
-      <section id="guideView" class="view">
-        <div class="guide-header">
+        <div class="nav-label">工作台</div>
+        <button class="nav-item active" data-view="library" data-title="错题库">
+          <span>▦</span>错题库 <em id="totalCount">0</em>
+        </button>
+        <button class="nav-item" data-view="review" data-title="滚动复习">
+          <span>◷</span>滚动复习 <em id="navReviewCount">0</em>
+        </button>
+        <button class="nav-item" data-view="exam" data-title="智能组卷">
+          <span>▤</span>智能组卷
+        </button>
+        <button class="nav-item" data-view="insights" data-title="学习洞察">
+          <span>⌁</span>学习洞察
+        </button>
+        <button class="nav-item" data-view="config" data-title="科目配置">
+          <span>⚙</span>科目配置
+        </button>
+        <button class="nav-item" data-view="guide" data-title="使用指引">
+          <span>☰</span>使用指引
+        </button>
+        <div class="nav-label subjects-label">我的科目</div>
+        <div id="subjectNav"></div>
+        <div class="sidebar-bottom">
+          <div class="streak">
+            <span>知识分类</span
+            ><strong id="streakDays">0 <small>类</small></strong
+            ><i>↗</i>
+          </div>
+          <button class="settings">⚙ 设置</button>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
           <div>
-            <p class="eyebrow">GUIDE MAP</p>
-            <h2>功能总览与使用路径</h2>
-            <p class="muted">先看现在能做什么，再看还能往哪长。</p>
+            <p class="eyebrow" id="todayLabel">TODAY</p>
+            <h1 id="pageTitle">错题库</h1>
           </div>
-          <div class="insight-grid guide-metrics">
-            <div class="metric-card"><span>当前错题</span><strong id="guideTotal">0</strong><small>本地题库</small></div>
-            <div class="metric-card"><span>今日计划</span><strong id="guideToday">0</strong><small>自动排题</small></div>
-            <div class="metric-card"><span>同步状态</span><strong id="guideSync">本地</strong><small id="guideSyncHint">未配置云地址</small></div>
+          <div class="top-actions">
+            <button class="primary-btn" id="newQuestion">新建错题</button>
           </div>
-        </div>
-        <div class="guide-grid">
-          <div class="rail-card">
-            <div class="section-head compact"><h3>现有功能</h3><span class="muted">当前可用</span></div>
-            <div id="guideFeatures" class="guide-list"></div>
+        </header>
+        <section id="libraryView" class="view active-view">
+          <div class="overview-row">
+            <div><p class="muted">把做错的题，变成下一次做对的底气。</p></div>
+            <div class="progress-card">
+              <div>
+                <span>近 7 天入库</span><strong id="weekProgress">0 道</strong>
+              </div>
+              <div class="progress-track">
+                <i id="weekProgressBar" style="width: 0%"></i>
+              </div>
+              <small id="weekRemain">近 7 天暂无新增</small>
+            </div>
           </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>使用指引</h3><span class="muted">四步</span></div>
-            <ol id="guideSteps" class="step-list"></ol>
+          <div class="filters">
+            <div class="segmented" id="subjectFilters"></div>
+            <div class="filter-right">
+              <select id="unitFilter" aria-label="按模块或单元筛选">
+                <option value="all">全部单元</option></select
+              ><select id="sortFilter" aria-label="错题排序方式">
+                <option value="recent">最近添加</option>
+                <option value="hard">难度优先</option></select
+              ><button
+                class="view-toggle active"
+                title="卡片视图"
+                aria-label="切换到卡片视图"
+              >
+                卡片视图</button
+              ><button
+                class="view-toggle"
+                title="紧凑视图"
+                aria-label="切换到紧凑视图"
+              >
+                紧凑视图
+              </button>
+            </div>
           </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>逻辑架构</h3><span class="muted">主流程</span></div>
-            <div id="guideFlow" class="flow-list"></div>
+          <div class="content-grid">
+            <div>
+              <div class="section-head">
+                <h2 id="listHeading">全部错题 <span id="listCount">0</span></h2>
+                <button class="ghost-btn" id="importBtn">⇧ 导入 PDF 截图</button
+                ><input
+                  id="fileInput"
+                  type="file"
+                  accept="image/*,.pdf"
+                  hidden
+                />
+              </div>
+              <div id="questionList" class="question-list"></div>
+            </div>
+            <aside class="right-rail">
+              <div class="rail-card accent-card">
+                <div class="rail-icon">↯</div>
+                <div>
+                  <strong>近期错题焦点</strong>
+                  <p id="weakSummary">录入错题后，这里会显示最集中的分类。</p>
+                  <button id="focusWeak">查看专项练习 →</button>
+                </div>
+              </div>
+              <div class="rail-card">
+                <div class="section-head compact">
+                  <h3>知识点分布</h3>
+                  <span class="muted">本月</span>
+                </div>
+                <div id="topicBars"></div>
+              </div>
+              <div class="rail-card">
+                <div class="section-head compact">
+                  <h3>错题入库日历</h3>
+                  <span class="muted">2026年8月</span>
+                </div>
+                <div class="calendar" id="calendar"></div>
+              </div>
+            </aside>
           </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>头脑风暴</h3><span class="muted">下一批可加</span></div>
-            <div id="guideIdeas" class="guide-list"></div>
+        </section>
+        <section id="reviewView" class="view">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">BROWSE REVIEW</p>
+              <h2>滚动复习 <span id="reviewCount"></span></h2>
+              <p class="muted">
+                从上到下浏览即可，不记录熟练度，也不要求额外标记。
+              </p>
+            </div>
+            <button class="ghost-btn" id="exportBtn">⇩ 导出备份</button>
           </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>数据接口</h3><span class="muted">本地键与同步包</span></div>
-            <div id="guideData" class="guide-list"></div>
+          <div id="reviewList" class="question-list review-scroll-list"></div>
+        </section>
+        <section id="examView" class="view">
+          <div class="insight-header">
+            <div>
+              <p class="eyebrow">SMART PAPER</p>
+              <h2>智能组卷</h2>
+              <p class="muted">
+                仅支持数学与 822 控制。可按“知识大类 × 题型”分别指定题量。
+              </p>
+            </div>
           </div>
-          <div class="rail-card">
-            <div class="section-head compact"><h3>同步与备份</h3><span class="muted">可操作</span></div>
-            <div class="guide-list" id="syncAddressList"></div>
-            <div class="sync-form">
-              <label>同步地址<input id="syncEndpointInput" type="url" placeholder="https://your-sync-endpoint" /></label>
-              <label>配对令牌<input id="syncTokenInput" type="text" placeholder="Windows 桌面版显示的令牌" /></label>
-              <label>用户标识<input id="syncUserInput" type="text" placeholder="local" /></label>
-              <div class="sync-actions">
-                <button class="primary-btn" type="button" id="saveSyncConfig">保存配置</button>
-                <button class="ghost-btn" type="button" id="syncNowGuide">立即同步</button>
-                <button class="ghost-btn" type="button" id="copySyncAddress">复制 Windows 地址</button>
-                <button class="ghost-btn" type="button" id="importBackupBtn">导入备份</button>
-                <button class="ghost-btn" type="button" id="exportBackupBtn">导出备份</button>
-                <input id="backupFileInput" type="file" accept="application/json" hidden />
+          <div class="exam-grid">
+            <div class="rail-card exam-builder">
+              <div class="section-head compact">
+                <h3>本次组卷配置</h3>
+                <span class="muted" id="examTotal">共 0 道</span>
+              </div>
+              <label class="exam-title-label"
+                >试卷名称<input
+                  id="examTitle"
+                  maxlength="80"
+                  placeholder="例如：线性代数阶段复习卷"
+              /></label>
+              <div id="examQuotaRows" class="exam-quota-rows"></div>
+              <button
+                class="primary-btn exam-generate"
+                id="generateExam"
+                type="button"
+              >
+                生成试卷版 + 答案版 PDF
+              </button>
+              <div
+                id="examResult"
+                class="exam-result"
+                role="status"
+                aria-live="polite"
+              ></div>
+              <p class="muted exam-hint">
+                文件与组卷历史保存在
+                E:\错题本数据\试卷。若分类题量不足，会生成现有题目并提示缺口。
+              </p>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>组卷历史</h3>
+                <button class="ghost-btn" id="refreshExamHistory">刷新</button>
+              </div>
+              <div id="examHistory" class="exam-history">
+                <div class="no-results">还没有组卷记录</div>
               </div>
             </div>
           </div>
+        </section>
+        <section id="insightsView" class="view">
+          <div class="insight-header">
+            <div>
+              <p class="eyebrow">LEARNING SIGNALS</p>
+              <h2>学习洞察</h2>
+              <p class="muted">用错题的分布，找到下一步该花时间的地方。</p>
+            </div>
+          </div>
+          <div class="insight-grid">
+            <div class="metric-card">
+              <span>累计错题</span><strong id="metricTotal">0</strong
+              ><small id="metricDelta">本周暂无新增</small>
+            </div>
+            <div class="metric-card">
+              <span>知识分类</span><strong id="masteryRate">0</strong
+              ><small id="masteryHint">当前题库涉及的大类数量</small>
+            </div>
+            <div class="metric-card">
+              <span>同步状态</span><strong id="syncStatus">本地</strong
+              ><small id="syncHint">未配置云同步</small
+              ><button class="ghost-btn sync-btn" id="syncNow">同步</button>
+            </div>
+          </div>
+        </section>
+        <section id="configView" class="view">
+          <div class="insight-header">
+            <div>
+              <p class="eyebrow">CONFIGURATION</p>
+              <h2>科目配置</h2>
+              <p class="muted">
+                蓝色是可继续分级的知识分类，红色是与知识路径并行的题型。两者都可添加和删除。
+              </p>
+            </div>
+          </div>
+          <div class="guide-grid">
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>知识分类与题型</h3>
+                <span class="muted">英语 · 数学 · 822控制</span>
+              </div>
+              <div id="subjectConfigCards" class="guide-list"></div>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>标签建议</h3>
+                <span class="muted">可选</span>
+              </div>
+              <div id="tagSuggestionPanel" class="guide-list"></div>
+            </div>
+          </div>
+        </section>
+        <section id="guideView" class="view">
+          <div class="guide-header">
+            <div>
+              <p class="eyebrow">GUIDE MAP</p>
+              <h2>功能总览与使用路径</h2>
+              <p class="muted">先看现在能做什么，再看还能往哪长。</p>
+            </div>
+            <div class="insight-grid guide-metrics">
+              <div class="metric-card">
+                <span>当前错题</span><strong id="guideTotal">0</strong
+                ><small>本地题库</small>
+              </div>
+              <div class="metric-card">
+                <span>滚动题量</span><strong id="guideToday">0</strong
+                ><small>当前全部题</small>
+              </div>
+              <div class="metric-card">
+                <span>同步状态</span><strong id="guideSync">本地</strong
+                ><small id="guideSyncHint">未配置云地址</small>
+              </div>
+            </div>
+          </div>
+          <div class="guide-grid">
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>现有功能</h3>
+                <span class="muted">当前可用</span>
+              </div>
+              <div id="guideFeatures" class="guide-list"></div>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>使用指引</h3>
+                <span class="muted">四步</span>
+              </div>
+              <ol id="guideSteps" class="step-list"></ol>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>逻辑架构</h3>
+                <span class="muted">主流程</span>
+              </div>
+              <div id="guideFlow" class="flow-list"></div>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>头脑风暴</h3>
+                <span class="muted">下一批可加</span>
+              </div>
+              <div id="guideIdeas" class="guide-list"></div>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>数据接口</h3>
+                <span class="muted">本地键与同步包</span>
+              </div>
+              <div id="guideData" class="guide-list"></div>
+            </div>
+            <div class="rail-card">
+              <div class="section-head compact">
+                <h3>同步与备份</h3>
+                <span class="muted">可操作</span>
+              </div>
+              <div class="guide-list" id="syncAddressList"></div>
+              <div class="sync-form">
+                <label
+                  >同步地址<input
+                    id="syncEndpointInput"
+                    type="url"
+                    placeholder="https://your-sync-endpoint"
+                /></label>
+                <label
+                  >配对令牌<input
+                    id="syncTokenInput"
+                    type="text"
+                    placeholder="Windows 桌面版显示的令牌"
+                /></label>
+                <label
+                  >用户标识<input
+                    id="syncUserInput"
+                    type="text"
+                    placeholder="local"
+                /></label>
+                <div class="sync-actions">
+                  <button class="primary-btn" type="button" id="saveSyncConfig">
+                    保存配置
+                  </button>
+                  <button class="ghost-btn" type="button" id="syncNowGuide">
+                    立即同步
+                  </button>
+                  <button class="ghost-btn" type="button" id="copySyncAddress">
+                    复制 Windows 地址
+                  </button>
+                  <button class="ghost-btn" type="button" id="importBackupBtn">
+                    导入备份
+                  </button>
+                  <button class="ghost-btn" type="button" id="exportBackupBtn">
+                    导出备份
+                  </button>
+                  <input
+                    id="backupFileInput"
+                    type="file"
+                    accept="application/json"
+                    hidden
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="modal-backdrop" id="modal">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">NEW ENTRY</p>
+            <h2>新建错题</h2>
+          </div>
+          <button class="close-btn" id="closeModal">关闭</button>
         </div>
-      </section>
-    </main>
-  </div>
-  <div class="modal-backdrop" id="modal"><div class="modal"><div class="modal-head"><div><p class="eyebrow">NEW ENTRY</p><h2>新建错题</h2></div><button class="close-btn" id="closeModal">关闭</button></div><form id="questionForm"><label>题目标题<input required name="title" placeholder="例如：矩阵特征值的计算" /></label><div class="form-row"><label>科目<select name="subject" id="subjectSelect"></select></label><label>模块<select name="module" id="moduleSelect"></select></label></div><div class="form-row"><label>单元<input name="unit" placeholder="例如：第 3 单元 / 习题 2" /></label><label>知识点 <span class="label-hint">用逗号分隔</span><input name="topic" placeholder="特征值, 对角化" /></label></div><label>标签 <span class="label-hint">用逗号分隔，可选</span><input name="tags" placeholder="计算错误, 审题失误" /></label><label>题目内容<textarea required name="question" rows="4" placeholder="粘贴题目，或上传 PDF 截图后补充说明"></textarea></label><div id="attachmentPreview" class="attachment-preview"></div><label>答案与解析<textarea name="answer" rows="4" placeholder="先写出标准答案，再补充关键步骤"></textarea></label><div class="form-row"><label>我的反思<textarea name="reflection" rows="3" placeholder="这次为什么会错？下次如何避免？"></textarea></label><label>奥技 / 结论<textarea name="conclusion" rows="3" placeholder="提炼可迁移的结论或技巧"></textarea></label></div><div class="form-foot"><span class="muted">保存后可在卡片中分步查看答案</span><button class="primary-btn" type="submit">保存错题</button></div></form></div></div>
-  <div class="modal-backdrop" id="classificationModal"><div class="modal"><div class="modal-head"><div><p class="eyebrow">分类编辑</p><h2>修改归类</h2></div><button class="close-btn" id="closeClassification">关闭</button></div><form id="classificationForm"><div class="form-row"><label>科目<select id="classificationSubject" name="subject"></select></label><label>模块<select id="classificationModule" name="module"></select></label></div><div class="form-row"><label>单元<input id="classificationUnit" name="unit" placeholder="例如：第 3 单元 / 习题 2" /></label><label>知识点 <span class="label-hint">用逗号分隔</span><input id="classificationTopic" name="topic" placeholder="特征值, 对角化" /></label></div><label>标签 <span class="label-hint">用逗号分隔，可选</span><input id="classificationTags" name="tags" placeholder="计算错误, 审题失误" /></label><div class="form-foot"><span class="muted">仅修改归类，不改题干和答案</span><button class="primary-btn" type="submit">保存归类</button></div></form></div></div>
-  <div class="toast" id="toast"></div><script src="app.js"></script>
-</body></html>
+        <form id="questionForm">
+          <label
+            >题目标题<input
+              required
+              name="title"
+              placeholder="例如：矩阵特征值的计算"
+          /></label>
+          <div class="form-row">
+            <label
+              >科目<select name="subject" id="subjectSelect"></select></label
+            ><label
+              >题型<select name="questionType" id="questionTypeSelect"></select
+            ></label>
+          </div>
+          <label
+            >知识分类 <span class="label-hint">选中后会继续显示下一级</span>
+            <div
+              id="knowledgePathSelects"
+              class="knowledge-path-selects"
+            ></div></label
+          ><label
+            >知识点 <span class="label-hint">与分类、题型独立，用逗号分隔</span
+            ><input name="topic" placeholder="特征值, 对角化" /></label
+          ><label
+            >标签 <span class="label-hint">用逗号分隔，可选</span
+            ><input name="tags" placeholder="计算错误, 审题失误" /></label
+          ><label
+            >题目内容<textarea
+              required
+              name="question"
+              rows="4"
+              placeholder="粘贴题目，或上传 PDF 截图后补充说明"
+            ></textarea>
+          </label>
+          <div id="attachmentPreview" class="attachment-preview"></div>
+          <label
+            >答案与解析<textarea
+              name="answer"
+              rows="4"
+              placeholder="先写出标准答案，再补充关键步骤"
+            ></textarea>
+          </label>
+          <div class="form-row">
+            <label
+              >我的反思<textarea
+                name="reflection"
+                rows="3"
+                placeholder="这次为什么会错？下次如何避免？"
+              ></textarea></label
+            ><label
+              >奥技 / 结论<textarea
+                name="conclusion"
+                rows="3"
+                placeholder="提炼可迁移的结论或技巧"
+              ></textarea>
+            </label>
+          </div>
+          <div class="form-foot">
+            <span class="muted">保存后可在卡片中分步查看答案</span
+            ><button class="primary-btn" type="submit">保存错题</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="classificationModal">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">分类编辑</p>
+            <h2>修改归类</h2>
+          </div>
+          <button class="close-btn" id="closeClassification">关闭</button>
+        </div>
+        <form id="classificationForm">
+          <div class="form-row">
+            <label
+              >科目<select
+                id="classificationSubject"
+                name="subject"
+              ></select></label
+            ><label
+              >题型<select
+                id="classificationQuestionType"
+                name="questionType"
+              ></select
+            ></label>
+          </div>
+          <label
+            >知识分类
+            <div
+              id="classificationKnowledgePath"
+              class="knowledge-path-selects"
+            ></div></label
+          ><label
+            >知识点 <span class="label-hint">用逗号分隔</span
+            ><input
+              id="classificationTopic"
+              name="topic"
+              placeholder="特征值, 对角化" /></label
+          ><label
+            >标签 <span class="label-hint">用逗号分隔，可选</span
+            ><input
+              id="classificationTags"
+              name="tags"
+              placeholder="计算错误, 审题失误"
+          /></label>
+          <div class="form-foot">
+            <span class="muted">仅修改归类，不改题干和答案</span
+            ><button class="primary-btn" type="submit">保存归类</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal-backdrop" id="textPromptModal">
+      <div class="modal text-prompt-modal" role="dialog" aria-modal="true">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">快速填写</p>
+            <h2 id="textPromptTitle">请输入名称</h2>
+          </div>
+          <button class="close-btn" id="closeTextPrompt" type="button">
+            关闭
+          </button>
+        </div>
+        <form id="textPromptForm">
+          <label
+            ><span id="textPromptHint">名称</span
+            ><input
+              id="textPromptInput"
+              autocomplete="off"
+              maxlength="80"
+              required
+          /></label>
+          <div class="form-foot">
+            <button class="ghost-btn" id="cancelTextPrompt" type="button">
+              取消
+            </button>
+            <button class="primary-btn" type="submit">确认</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script src="taxonomy-utils.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
