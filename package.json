@@ -1,12 +1,12 @@
 {
   "name": "shiti-kaoyan",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "拾题 · 考研错题本（本地优先，局域网多端同步）",
   "main": "main.js",
   "author": "chouyangceng",
   "license": "MIT",
   "scripts": {
-    "test": "node tests/taxonomy-utils.test.js && node tests/exam-utils.test.js && node tests/exam-pdf.test.js && node tests/sync-server.test.js",
+    "test": "node tests/taxonomy-utils.test.js && node tests/exam-utils.test.js && node tests/exam-pdf.test.js && node tests/crop-utils.test.js && node tests/sync-server.test.js",
     "start": "electron .",
     "dist": "electron-builder --win portable --mac dmg --linux",
     "dist:win": "electron-builder --win portable",

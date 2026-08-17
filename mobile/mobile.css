@@ -208,6 +208,17 @@ button {
   max-height: 220px;
   border-radius: 10px;
 }
+.file-preview span {
+  overflow-wrap: anywhere;
+}
+.file-preview .recrop-file {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  background: #f2f6f3;
+  color: var(--primary);
+}
 .message {
   min-height: 24px;
   margin-top: 10px;

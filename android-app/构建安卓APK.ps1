@@ -20,5 +20,7 @@ $licenseCmd='(for /l %i in (1,1,30) do @echo y) | "' + $sdkManager + '" --sdk_ro
 & $sdkManager --sdk_root=$sdk 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
 & $gradle --no-daemon assembleDebug
 $apk=Get-Item '.\app\build\outputs\apk\debug\app-debug.apk'
-Copy-Item -LiteralPath $apk.FullName -Destination 'E:\错题本数据\拾题手机端-debug.apk' -Force
-Write-Output 'APK_READY=E:\错题本数据\拾题手机端-debug.apk'
+$desktop=[Environment]::GetFolderPath([Environment+SpecialFolder]::Desktop)
+$destination=Join-Path $desktop 'shiti-mobile-debug.apk'
+Copy-Item -LiteralPath $apk.FullName -Destination $destination -Force
+Write-Output "APK_READY=$destination"

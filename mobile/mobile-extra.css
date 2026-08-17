@@ -483,3 +483,202 @@
   width: auto;
   margin: 0;
 }
+
+body.cropper-open {
+  overflow: hidden;
+}
+
+.image-cropper {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: none;
+  background: #101713;
+  color: #f7faf8;
+}
+.image-cropper.show {
+  display: block;
+}
+.cropper-sheet {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #101713;
+}
+.cropper-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: max(12px, env(safe-area-inset-top)) 16px 10px;
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
+}
+.cropper-header span {
+  display: block;
+  color: #aebbb4;
+  font-size: 12px;
+  font-weight: 700;
+}
+.cropper-header h2 {
+  margin: 2px 0 0;
+  color: #fff;
+  font-size: 18px;
+}
+.cropper-header button,
+.cropper-actions button,
+.crop-ratios button {
+  min-height: 48px;
+  margin: 0;
+  border-radius: 10px;
+}
+.cropper-text-btn {
+  min-width: 64px;
+  padding: 8px 12px;
+  background: transparent;
+  color: #dbe5df;
+}
+.cropper-body {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cropper-stage {
+  min-width: 0;
+  min-height: 190px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 16px;
+  background: #080c0a;
+}
+#cropCanvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: 1px solid rgb(255 255 255 / 55%);
+  background: #171d19;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 38%);
+  cursor: grab;
+  touch-action: none;
+}
+#cropCanvas:active {
+  cursor: grabbing;
+}
+#cropCanvas:focus-visible {
+  outline: 3px solid #77b895;
+  outline-offset: 3px;
+}
+.cropper-tools {
+  flex: 0 0 auto;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  background: #151e19;
+}
+.crop-ratios {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.crop-ratios button {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #435249;
+  background: #202b25;
+  color: #dbe5df;
+  font-size: 13px;
+}
+.crop-ratios button.active {
+  border-color: #8bc4a4;
+  background: #dcefe4;
+  color: #173d2d;
+}
+.crop-zoom {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+  color: #e8efeb;
+  font-size: 14px;
+}
+.crop-zoom input {
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  accent-color: #77b895;
+  background: transparent;
+}
+.crop-status {
+  min-height: 20px;
+  margin: 0;
+  color: #f0b7b3;
+  font-size: 13px;
+  text-align: center;
+}
+.cropper-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px;
+}
+.cropper-secondary {
+  border: 1px solid #526159;
+  background: #202b25;
+  color: #e8efeb;
+}
+.cropper-primary {
+  background: #dcefe4;
+  color: #173d2d;
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .cropper-header {
+    min-height: 60px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  .cropper-body {
+    flex-direction: row;
+  }
+  .cropper-stage {
+    min-width: 0;
+    min-height: 0;
+    padding: 12px;
+  }
+  .cropper-tools {
+    width: min(38vw, 300px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px max(14px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) 14px;
+    border-top: 0;
+    border-left: 1px solid rgb(255 255 255 / 12%);
+  }
+  .crop-ratios {
+    grid-template-columns: 1fr;
+  }
+  .crop-status {
+    min-height: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .image-cropper.show .cropper-sheet {
+    animation: cropper-enter 180ms ease-out;
+  }
+  @keyframes cropper-enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

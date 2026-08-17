@@ -316,6 +316,78 @@
         </div>
       </form>
     </div>
+    <div
+      class="image-cropper"
+      id="imageCropper"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cropperTitle"
+      aria-hidden="true"
+    >
+      <section class="cropper-sheet">
+        <header class="cropper-header">
+          <div>
+            <span>图片处理</span>
+            <h2 id="cropperTitle">裁剪题目图片</h2>
+          </div>
+          <button id="cancelCropBtn" class="cropper-text-btn" type="button">
+            取消
+          </button>
+        </header>
+        <div class="cropper-body">
+          <div class="cropper-stage" id="cropperStage">
+            <canvas
+              id="cropCanvas"
+              tabindex="0"
+              aria-label="裁剪区域，可拖动图片并使用缩放滑杆调整"
+            ></canvas>
+          </div>
+          <div class="cropper-tools">
+            <div class="crop-ratios" role="group" aria-label="裁剪比例">
+              <button
+                class="active"
+                data-crop-ratio="source"
+                type="button"
+                aria-pressed="true"
+              >
+                原比例
+              </button>
+              <button
+                data-crop-ratio="1.333333"
+                type="button"
+                aria-pressed="false"
+              >
+                题目横图
+              </button>
+              <button data-crop-ratio="1" type="button" aria-pressed="false">
+                方形
+              </button>
+            </div>
+            <label class="crop-zoom" for="cropZoom">
+              <span>缩放</span>
+              <input
+                id="cropZoom"
+                type="range"
+                min="0"
+                max="100"
+                value="0"
+                step="1"
+              />
+            </label>
+            <p id="cropStatus" class="crop-status" aria-live="polite"></p>
+            <div class="cropper-actions">
+              <button id="resetCropBtn" class="cropper-secondary" type="button">
+                重置
+              </button>
+              <button id="confirmCropBtn" class="cropper-primary" type="button">
+                确认裁剪
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script src="crop-utils.js" defer></script>
     <script src="mobile.js" defer></script>
   </body>
 </html>
