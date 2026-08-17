@@ -1,5 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1f2525"/>
-  <rect x="88" y="88" width="336" height="336" rx="48" fill="#2b8a78"/>
-  <text x="256" y="318" text-anchor="middle" font-size="180" font-family="PingFang SC, Microsoft Yahei, sans-serif" font-weight="700" fill="#fff">拾</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">拾题应用图标</title>
+  <desc id="description">深绿色底色上的错题卡与问号标志</desc>
+  <rect width="512" height="512" rx="116" fill="#17483b"/>
+  <g transform="rotate(-6 256 256)">
+    <rect x="151" y="151" width="238" height="248" rx="49" fill="#f07d6c"/>
+    <rect x="122" y="117" width="244" height="252" rx="51" fill="#f7fbf8"/>
+    <path d="M205 211c0-41 30-60 67-60 42 0 71 27 71 65 0 33-21 50-45 65-19 12-26 27-26 47" fill="none" stroke="#17483b" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="272" cy="349" r="18" fill="#17483b"/>
+  </g>
+  <path d="M391 96l10 25 25 10-25 10-10 25-10-25-25-10 25-10z" fill="#9ed4b7"/>
 </svg>

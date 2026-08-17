@@ -13,13 +13,18 @@ const CONFIG_SCHEMA_VERSION = 2;
 let selectedFile = null;
 let selectedFileData = "";
 let selectedImageSource = null;
+let selectedAnswerFile = null;
+let selectedAnswerFileData = "";
+let selectedAnswerImageSource = null;
 let editingId = "";
 let removeExistingFile = false;
+let removeExistingAnswerFile = false;
 let editingKnowledgePath = [];
 let textPromptResolver = null;
 const cropState = {
   image: null,
   source: null,
+  target: "question",
   ratioMode: "source",
   viewportWidth: 0,
   viewportHeight: 0,
@@ -427,11 +432,12 @@ function applyCropScale(scale, pointX, pointY) {
   renderCropCanvas();
 }
 
-async function openImageCropper(source) {
+async function openImageCropper(source, target = "question") {
   try {
     const image = await loadImage(source.data);
     cropState.image = image;
     cropState.source = { ...source };
+    cropState.target = target;
     cropState.ratioMode = "source";
     cropState.pointers.clear();
     cropState.gesture = null;
@@ -442,6 +448,8 @@ async function openImageCropper(source) {
       button.setAttribute("aria-pressed", String(active));
     });
     $("#cropStatus").textContent = "";
+    $("#cropperTitle").textContent =
+      target === "answer" ? "裁剪答案图片" : "裁剪题目图片";
     $("#imageCropper").classList.add("show");
     $("#imageCropper").setAttribute("aria-hidden", "false");
     document.body.classList.add("cropper-open");
@@ -450,7 +458,11 @@ async function openImageCropper(source) {
       $("#cancelCropBtn").focus();
     });
   } catch {
-    $("#file").value = "";
+    ["#file", "#questionCameraFile", "#answerFile", "#answerCameraFile"].forEach(
+      (selector) => {
+        $(selector).value = "";
+      },
+    );
     message("图片读取失败，请重新选择或换一张图片");
   }
 }
@@ -461,7 +473,11 @@ function closeImageCropper(restoreFocus = true) {
   document.body.classList.remove("cropper-open");
   cropState.pointers.clear();
   cropState.gesture = null;
-  $("#file").value = "";
+  ["#file", "#questionCameraFile", "#answerFile", "#answerCameraFile"].forEach(
+    (selector) => {
+      $(selector).value = "";
+    },
+  );
   if (restoreFocus) cropState.returnFocus?.focus?.();
 }
 
@@ -615,20 +631,26 @@ function updateClassification(path = []) {
   });
 }
 
-function previewFile(name, type, data, remote = false) {
-  const box = $("#filePreview");
+function previewFile(name, type, data, remote = false, target = "question") {
+  const isAnswer = target === "answer";
+  const box = $(isAnswer ? "#answerFilePreview" : "#filePreview");
+  const removeButton = $(isAnswer ? "#removeAnswerFileBtn" : "#removeFileBtn");
+  const source = isAnswer ? selectedAnswerImageSource : selectedImageSource;
+  const file = isAnswer ? selectedAnswerFile : selectedFile;
   box.innerHTML = "";
   box.classList.toggle("empty", !name);
   if (type?.startsWith("image/") && data) {
     const img = document.createElement("img");
-    img.alt = "题目附件预览";
+    img.alt = isAnswer ? "答案图片预览" : "题目附件预览";
     img.src = data;
     box.append(img);
   }
   const span = document.createElement("span");
   span.textContent = name
     ? `${name}${remote ? "（附件在电脑端）" : ""}`
-    : "尚未选择附件，也可以只录入文字题目";
+    : isAnswer
+      ? "尚未添加答案图片"
+      : "尚未添加题目图片，也可以只录入文字题干";
   box.append(span);
   if (type?.startsWith("image/") && data && !remote) {
     const button = document.createElement("button");
@@ -637,11 +659,12 @@ function previewFile(name, type, data, remote = false) {
     button.textContent = "重新裁剪";
     button.onclick = () =>
       openImageCropper(
-        selectedImageSource || { name, type, data, size: selectedFile?.size || 0 },
+        source || { name, type, data, size: file?.size || 0 },
+        target,
       );
     box.append(button);
   }
-  $("#removeFileBtn").classList.toggle("hidden", !name || remote);
+  removeButton.classList.toggle("hidden", !name || remote);
 }
 
 function switchView(viewId) {
@@ -660,18 +683,26 @@ function resetForm() {
   selectedFile = null;
   selectedFileData = "";
   selectedImageSource = null;
+  selectedAnswerFile = null;
+  selectedAnswerFileData = "";
+  selectedAnswerImageSource = null;
   removeExistingFile = false;
+  removeExistingAnswerFile = false;
   $("#questionForm").reset();
   $("#mobileSubject").value = "数学";
   updateQuestionTypes();
   updateClassification();
   $("#file").value = "";
+  $("#questionCameraFile").value = "";
+  $("#answerFile").value = "";
+  $("#answerCameraFile").value = "";
   $("#formTitle").textContent = "保存一道错题";
   $("#submitBtn").textContent = "保存到本机题库";
   $("#cancelEditBtn").classList.add("hidden");
   $("#contentError").textContent = "";
   $("#classificationError").textContent = "";
   previewFile("", "", "");
+  previewFile("", "", "", false, "answer");
 }
 
 function statusText(item) {
@@ -729,7 +760,11 @@ async function renderLibrary() {
         : item.remoteAttachment
           ? `<p class="attachment-note">附件保存在电脑端：${esc(item.remoteAttachment.name || "附件")}</p>`
           : "";
-    card.innerHTML = `<div class="question-card-head"><div><strong>${esc(item.title || "未命名错题")}</strong><p><span class="knowledge-chip">${esc(item.subject)} · ${esc(path)}</span><span class="type-chip">${esc(item.questionType || "未分类题型")}</span></p></div><span class="sync-state ${esc(item.syncStatus || "pending")}">${esc(statusText(item))}</span></div>${image}${attachment}<p class="question-stem">${esc(item.question || "题干保存在附件中")}</p><div class="answer-panel hidden"><strong>答案 / 解析</strong><p>${esc(item.answer || "暂未填写")}</p></div><div class="queue-actions"><button class="secondary reveal-answer" type="button">查看答案</button><button class="secondary edit-question" type="button">编辑</button><button class="delete-question" type="button">删除</button></div>`;
+    const answerImage =
+      item.answerFile?.data && item.answerFile.type?.startsWith("image/")
+        ? `<img class="answer-image" src="${esc(item.answerFile.data)}" alt="${esc(item.answerFile.name || "答案图片")}">`
+        : "";
+    card.innerHTML = `<div class="question-card-head"><div><strong>${esc(item.title || "未命名错题")}</strong><p><span class="knowledge-chip">${esc(item.subject)} · ${esc(path)}</span><span class="type-chip">${esc(item.questionType || "未分类题型")}</span></p></div><span class="sync-state ${esc(item.syncStatus || "pending")}">${esc(statusText(item))}</span></div>${image}${attachment}<p class="question-stem">${esc(item.question || "题干保存在附件中")}</p><div class="answer-panel hidden"><strong>答案 / 解析</strong><p>${esc(item.answer || (answerImage ? "答案见图片" : "暂未填写"))}</p>${answerImage}</div><div class="queue-actions"><button class="secondary reveal-answer" type="button">查看答案</button><button class="secondary edit-question" type="button">编辑</button><button class="delete-question" type="button">删除</button></div>`;
     const answerPanel = card.querySelector(".answer-panel");
     const revealButton = card.querySelector(".reveal-answer");
     revealButton.onclick = () => {
@@ -749,6 +784,7 @@ async function editQuestion(id) {
   editingKnowledgePath =
     item.knowledgePath || [item.module, item.unit].filter(Boolean);
   removeExistingFile = false;
+  removeExistingAnswerFile = false;
   const form = $("#questionForm");
   form.elements.subject.value = ACTIVE_SUBJECTS.includes(item.subject)
     ? item.subject
@@ -771,6 +807,18 @@ async function editQuestion(id) {
     item.file?.type || item.remoteAttachment?.type || "",
     selectedFileData,
     !item.file && Boolean(item.remoteAttachment),
+  );
+  selectedAnswerFile = null;
+  selectedAnswerFileData = item.answerFile?.data || "";
+  selectedAnswerImageSource = item.answerFile?.type?.startsWith("image/")
+    ? { ...item.answerFile }
+    : null;
+  previewFile(
+    item.answerFile?.name || "",
+    item.answerFile?.type || "",
+    selectedAnswerFileData,
+    false,
+    "answer",
   );
   $("#formTitle").textContent = "编辑本机错题";
   $("#submitBtn").textContent = "保存修改";
@@ -950,7 +998,7 @@ async function generatePaper() {
   $("#paperResult").innerHTML = selected
     .map(
       (item, index) =>
-        `<article class="paper-question"><strong>${index + 1}. ${esc(item.title)}</strong><p class="question-meta">${esc((item.knowledgePath || []).join(" › "))} · ${esc(item.questionType)}</p><p>${esc(item.question || "题干见附件")}</p><details><summary>查看答案</summary><p>${esc(item.answer || "暂未填写")}</p></details></article>`,
+        `<article class="paper-question"><strong>${index + 1}. ${esc(item.title)}</strong><p class="question-meta">${esc((item.knowledgePath || []).join(" › "))} · ${esc(item.questionType)}</p><p>${esc(item.question || "题干见附件")}</p><details><summary>查看答案</summary><p>${esc(item.answer || (item.answerFile?.data ? "答案见图片" : "暂未填写"))}</p>${item.answerFile?.data && item.answerFile.type?.startsWith("image/") ? `<img class="answer-image" src="${esc(item.answerFile.data)}" alt="${esc(item.answerFile.name || "答案图片")}">` : ""}</details></article>`,
     )
     .join("");
   $("#paperResultCard").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1012,6 +1060,7 @@ function remoteToLocal(remote, existing) {
     question: remote.question || "",
     answer: remote.answer || "",
     file: existing?.file || null,
+    answerFile: existing?.answerFile || null,
     remoteAttachment: remote.attachment || existing?.remoteAttachment || null,
     createdAt: remote.createdAt || existing?.createdAt || now(),
     updatedAt: remote.updatedAt || now(),
@@ -1322,7 +1371,10 @@ async function renderAll() {
 $$(".nav-button").forEach((button) => {
   button.onclick = () => switchView(button.dataset.view);
 });
-$("#cameraBtn").onclick = () => $("#file").click();
+$("#questionCameraBtn").onclick = () => $("#questionCameraFile").click();
+$("#questionGalleryBtn").onclick = () => $("#file").click();
+$("#answerCameraBtn").onclick = () => $("#answerCameraFile").click();
+$("#answerGalleryBtn").onclick = () => $("#answerFile").click();
 $("#cancelEditBtn").onclick = resetForm;
 $("#mobileSubject").onchange = () => {
   editingKnowledgePath = [];
@@ -1374,14 +1426,27 @@ $("#confirmCropBtn").onclick = async () => {
   $("#cropStatus").textContent = "";
   try {
     const croppedFile = await createCroppedFile();
-    selectedFile = croppedFile;
-    selectedFileData = await fileData(croppedFile);
-    selectedImageSource = { ...cropState.source };
-    removeExistingFile = false;
-    previewFile(croppedFile.name, croppedFile.type, selectedFileData);
+    const data = await fileData(croppedFile);
+    if (cropState.target === "answer") {
+      selectedAnswerFile = croppedFile;
+      selectedAnswerFileData = data;
+      selectedAnswerImageSource = { ...cropState.source };
+      removeExistingAnswerFile = false;
+      previewFile(croppedFile.name, croppedFile.type, data, false, "answer");
+    } else {
+      selectedFile = croppedFile;
+      selectedFileData = data;
+      selectedImageSource = { ...cropState.source };
+      removeExistingFile = false;
+      previewFile(croppedFile.name, croppedFile.type, data);
+    }
     $("#contentError").textContent = "";
     closeImageCropper(false);
-    $("#filePreview .recrop-file")?.focus();
+    $(
+      cropState.target === "answer"
+        ? "#answerFilePreview .recrop-file"
+        : "#filePreview .recrop-file",
+    )?.focus();
     message(
       `图片已裁剪并压缩为 ${Math.max(1, Math.round(croppedFile.size / 1024))}KB`,
       true,
@@ -1507,16 +1572,30 @@ $("#removeFileBtn").onclick = () => {
   selectedImageSource = null;
   removeExistingFile = true;
   $("#file").value = "";
+  $("#questionCameraFile").value = "";
   previewFile("", "", "");
   $("#contentError").textContent = "";
-  message("当前附件已移除", true);
+  message("题目附件已移除", true);
 };
-$("#file").onchange = async (event) => {
+$("#removeAnswerFileBtn").onclick = () => {
+  selectedAnswerFile = null;
+  selectedAnswerFileData = "";
+  selectedAnswerImageSource = null;
+  removeExistingAnswerFile = true;
+  $("#answerFile").value = "";
+  $("#answerCameraFile").value = "";
+  previewFile("", "", "", false, "answer");
+  message("答案图片已移除", true);
+};
+
+async function handleMediaSelection(event, target, allowPdf = false) {
   const candidate = event.target.files[0] || null;
   if (!candidate) return;
-  if (!allowedType(candidate.type)) {
+  const isImage = candidate.type.startsWith("image/");
+  const isPdf = candidate.type === "application/pdf";
+  if (!allowedType(candidate.type) || (!isImage && !(allowPdf && isPdf))) {
     event.target.value = "";
-    return message("仅支持 JPG、PNG、GIF、WebP 或 PDF");
+    return message(allowPdf ? "仅支持图片或 PDF" : "仅支持图片文件");
   }
   if (candidate.size > 25_000_000) {
     event.target.value = "";
@@ -1524,13 +1603,16 @@ $("#file").onchange = async (event) => {
   }
   try {
     const data = await fileData(candidate);
-    if (candidate.type.startsWith("image/")) {
-      await openImageCropper({
-        name: candidate.name,
-        type: candidate.type,
-        size: candidate.size,
-        data,
-      });
+    if (isImage) {
+      await openImageCropper(
+        {
+          name: candidate.name,
+          type: candidate.type,
+          size: candidate.size,
+          data,
+        },
+        target,
+      );
       return;
     }
     selectedFile = candidate;
@@ -1543,7 +1625,15 @@ $("#file").onchange = async (event) => {
     event.target.value = "";
     message("附件读取失败，请重新选择");
   }
-};
+}
+
+$("#file").onchange = (event) => handleMediaSelection(event, "question", true);
+$("#questionCameraFile").onchange = (event) =>
+  handleMediaSelection(event, "question");
+$("#answerFile").onchange = (event) =>
+  handleMediaSelection(event, "answer");
+$("#answerCameraFile").onchange = (event) =>
+  handleMediaSelection(event, "answer");
 $("#questionForm").onsubmit = async (event) => {
   event.preventDefault();
   const button = $("#submitBtn");
@@ -1571,6 +1661,16 @@ $("#questionForm").onsubmit = async (event) => {
       : removeExistingFile
         ? null
         : old?.file || null;
+    const answerFile = selectedAnswerFile
+      ? {
+          name: selectedAnswerFile.name,
+          type: selectedAnswerFile.type || "image/webp",
+          size: selectedAnswerFile.size,
+          data: selectedAnswerFileData,
+        }
+      : removeExistingAnswerFile
+        ? null
+        : old?.answerFile || null;
     if (
       !String(payload.question || "").trim() &&
       !file?.data &&
@@ -1595,6 +1695,7 @@ $("#questionForm").onsubmit = async (event) => {
         .map((item) => item.trim())
         .filter(Boolean),
       file,
+      answerFile,
       remoteAttachment: removeExistingFile
         ? null
         : old?.remoteAttachment || null,

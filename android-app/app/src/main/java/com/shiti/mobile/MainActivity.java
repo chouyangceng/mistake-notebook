@@ -1,8 +1,11 @@
 package com.shiti.mobile;
 
+import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.View;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -19,9 +22,13 @@ import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
+
+import java.io.File;
+import java.io.IOException;
 
 public class MainActivity extends ComponentActivity {
     private static final String APP_ORIGIN = "https://appassets.androidplatform.net";
@@ -31,6 +38,8 @@ public class MainActivity extends ComponentActivity {
     private ProgressBar progress;
     private ValueCallback<Uri[]> fileCallback;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
+    private Uri pendingCameraUri;
+    private File pendingCameraFile;
     private boolean legacySettingsInjected;
 
     @Override
@@ -43,13 +52,21 @@ public class MainActivity extends ComponentActivity {
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (fileCallback == null) return;
-                    fileCallback.onReceiveValue(
-                            WebChromeClient.FileChooserParams.parseResult(
+                    Uri[] files = null;
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+                        if (pendingCameraUri != null && (data == null || data.getData() == null)) {
+                            files = new Uri[]{pendingCameraUri};
+                        } else {
+                            files = WebChromeClient.FileChooserParams.parseResult(
                                     result.getResultCode(),
-                                    result.getData()
-                            )
-                    );
+                                    data
+                            );
+                        }
+                    }
+                    fileCallback.onReceiveValue(files);
                     fileCallback = null;
+                    pendingCameraUri = null;
                 }
         );
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -127,15 +144,64 @@ public class MainActivity extends ComponentActivity {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
                 try {
+                    if (params.isCaptureEnabled() && acceptsOnlyImages(params)) {
+                        launchCameraCapture();
+                        return true;
+                    }
                     fileChooserLauncher.launch(params.createIntent());
                     return true;
                 } catch (Exception error) {
+                    clearPendingCameraFile();
                     fileCallback.onReceiveValue(null);
                     fileCallback = null;
                     return false;
                 }
             }
         });
+    }
+
+    private boolean acceptsOnlyImages(WebChromeClient.FileChooserParams params) {
+        String[] types = params.getAcceptTypes();
+        if (types == null || types.length == 0) return false;
+        boolean hasImage = false;
+        for (String type : types) {
+            String value = type == null ? "" : type.trim().toLowerCase();
+            if (value.isEmpty()) continue;
+            if (!value.startsWith("image/")) return false;
+            hasImage = true;
+        }
+        return hasImage;
+    }
+
+    private void launchCameraCapture() throws IOException {
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (camera.resolveActivity(getPackageManager()) == null) {
+            throw new IOException("No camera app available");
+        }
+        clearPendingCameraFile();
+        File directory = new File(getCacheDir(), "camera-captures");
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Unable to create camera cache");
+        }
+        pendingCameraFile = File.createTempFile("shiti-photo-", ".jpg", directory);
+        pendingCameraUri = FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                pendingCameraFile
+        );
+        camera.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+        camera.setClipData(ClipData.newRawUri("shiti-camera", pendingCameraUri));
+        camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        camera.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        fileChooserLauncher.launch(camera);
+    }
+
+    private void clearPendingCameraFile() {
+        pendingCameraUri = null;
+        if (pendingCameraFile != null && pendingCameraFile.exists()) {
+            pendingCameraFile.delete();
+        }
+        pendingCameraFile = null;
     }
 
     private void migrateLegacyConnectionSettings(WebView view) {
@@ -161,6 +227,7 @@ public class MainActivity extends ComponentActivity {
             fileCallback.onReceiveValue(null);
             fileCallback = null;
         }
+        clearPendingCameraFile();
         webView.loadUrl("about:blank");
         webView.stopLoading();
         webView.destroy();

@@ -53,30 +53,10 @@
               <span class="step">01</span>
               <h2 id="formTitle">保存一道错题</h2>
             </div>
-            <button id="cameraBtn" class="text-btn" type="button">
-              选择图片 / PDF
-            </button>
           </div>
           <p class="offline-note">
             保存后立即进入本机题库，退出应用或重启手机后仍会保留。
           </p>
-          <input
-            id="file"
-            type="file"
-            accept="image/*,.pdf"
-            capture="environment"
-            hidden
-          />
-          <div id="filePreview" class="file-preview empty">
-            尚未选择附件，也可以只录入文字题目
-          </div>
-          <button
-            id="removeFileBtn"
-            class="secondary remove-file hidden"
-            type="button"
-          >
-            移除当前附件
-          </button>
           <div class="grid two">
             <label
               >科目<select name="subject" id="mobileSubject">
@@ -126,6 +106,38 @@
             role="alert"
             aria-live="assertive"
           ></p>
+          <section class="media-entry" aria-labelledby="questionMediaTitle">
+            <div class="media-entry-head">
+              <strong id="questionMediaTitle">题目图片 / PDF</strong>
+              <span>可选</span>
+            </div>
+            <div class="media-actions">
+              <button id="questionCameraBtn" class="media-button" type="button">
+                拍照
+              </button>
+              <button id="questionGalleryBtn" class="media-button" type="button">
+                相册 / PDF
+              </button>
+            </div>
+            <input
+              id="questionCameraFile"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+            />
+            <input id="file" type="file" accept="image/*,.pdf" hidden />
+            <div id="filePreview" class="file-preview empty">
+              尚未添加题目图片，也可以只录入文字题干
+            </div>
+            <button
+              id="removeFileBtn"
+              class="secondary remove-file hidden"
+              type="button"
+            >
+              移除题目附件
+            </button>
+          </section>
           <label
             >具体知识点
             <span class="required-hint">与知识分类、题型独立，用逗号分隔</span
@@ -138,6 +150,38 @@
               placeholder="也可以稍后在手机或电脑补充"
             ></textarea>
           </label>
+          <section class="media-entry" aria-labelledby="answerMediaTitle">
+            <div class="media-entry-head">
+              <strong id="answerMediaTitle">答案图片</strong>
+              <span>可选</span>
+            </div>
+            <div class="media-actions">
+              <button id="answerCameraBtn" class="media-button" type="button">
+                拍照
+              </button>
+              <button id="answerGalleryBtn" class="media-button" type="button">
+                从相册选择
+              </button>
+            </div>
+            <input
+              id="answerCameraFile"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+            />
+            <input id="answerFile" type="file" accept="image/*" hidden />
+            <div id="answerFilePreview" class="file-preview empty">
+              尚未添加答案图片
+            </div>
+            <button
+              id="removeAnswerFileBtn"
+              class="secondary remove-file hidden"
+              type="button"
+            >
+              移除答案图片
+            </button>
+          </section>
           <div class="form-actions">
             <button id="cancelEditBtn" class="secondary hidden" type="button">
               取消编辑
