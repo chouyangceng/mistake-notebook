@@ -6,6 +6,10 @@ const {
   normalizePath,
   addNode,
   removeNode,
+  flattenTree,
+  rebasePath,
+  renameNode,
+  moveNode,
 } = require("../taxonomy-utils");
 
 const migrated = normalizeConfig({
@@ -36,7 +40,41 @@ assert.equal(migrated.数学.questionTypes.includes("证明题"), true);
 assert.deepEqual(normalizePath(null, "高数", "极限"), ["高数", "极限"]);
 assert.equal(addNode(migrated, "数学", ["高数"], "极限"), true);
 assert.equal(addNode(migrated, "数学", ["高数"], "极限"), false);
-assert.equal(removeNode(migrated, "数学", ["高数", "极限"]), true);
+assert.deepEqual(
+  renameNode(migrated, "数学", ["高数", "极限"], "极限与连续"),
+  ["高数", "极限与连续"],
+);
+assert.deepEqual(
+  rebasePath(
+    ["高数", "极限", "洛必达"],
+    ["高数", "极限"],
+    ["高数", "极限与连续"],
+  ),
+  ["高数", "极限与连续", "洛必达"],
+);
+assert.deepEqual(
+  moveNode(migrated, "数学", ["高数", "极限与连续"], ["线性代数"]),
+  ["线性代数", "极限与连续"],
+);
+assert.equal(
+  moveNode(
+    migrated,
+    "数学",
+    ["线性代数"],
+    ["线性代数", "极限与连续"],
+  ),
+  null,
+);
+assert.equal(
+  flattenTree(migrated.数学.knowledgeTree).some(
+    (entry) => entry.path.join("/") === "线性代数/极限与连续",
+  ),
+  true,
+);
+assert.equal(
+  removeNode(migrated, "数学", ["线性代数", "极限与连续"]),
+  true,
+);
 
 const customized = normalizeConfig({
   _schemaVersion: CONFIG_SCHEMA_VERSION,

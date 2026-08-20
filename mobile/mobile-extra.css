@@ -383,8 +383,39 @@
 }
 .taxonomy-row > span:last-child {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
   flex: 0 0 auto;
+}
+.taxonomy-move-panel {
+  margin: 4px 0 10px;
+  padding: 12px;
+  border: 1px solid #c9ded4;
+  border-radius: 12px;
+  background: #f1f7f4;
+}
+.taxonomy-move-panel[hidden] {
+  display: none;
+}
+.taxonomy-move-panel label {
+  display: grid;
+  gap: 6px;
+  color: #40534a;
+  font-size: 13px;
+}
+.taxonomy-move-panel select {
+  min-height: 48px;
+}
+.taxonomy-move-panel > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+.taxonomy-move-panel .confirm-node-move {
+  border-color: #9bbcaf;
+  background: #dcece5;
 }
 .mini-action {
   min-height: 44px;
@@ -595,22 +626,21 @@ body.cropper-open {
   flex-direction: column;
 }
 .cropper-stage {
+  position: relative;
   min-width: 0;
   min-height: 190px;
   flex: 1;
-  display: grid;
-  place-items: center;
   overflow: hidden;
-  padding: 16px;
   background: #080c0a;
+  touch-action: none;
 }
 #cropCanvas {
+  position: absolute;
+  inset: 0;
   display: block;
-  max-width: 100%;
-  max-height: 100%;
-  border: 1px solid rgb(255 255 255 / 55%);
+  width: 100%;
+  height: 100%;
   background: #171d19;
-  box-shadow: 0 10px 32px rgb(0 0 0 / 38%);
   cursor: grab;
   touch-action: none;
 }
@@ -619,7 +649,121 @@ body.cropper-open {
 }
 #cropCanvas:focus-visible {
   outline: 3px solid #77b895;
-  outline-offset: 3px;
+  outline-offset: -4px;
+}
+.crop-selection {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  border: 2px solid #f7fff9;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 58%), 0 0 0 1px rgb(20 36 28 / 70%);
+  pointer-events: none;
+}
+.crop-grid-line {
+  position: absolute;
+  background: rgb(255 255 255 / 42%);
+  pointer-events: none;
+}
+.crop-grid-line.vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.crop-grid-line.horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.crop-grid-line.first {
+  left: 33.333%;
+}
+.crop-grid-line.second {
+  left: 66.666%;
+}
+.crop-grid-line.horizontal.first {
+  top: 33.333%;
+  left: 0;
+}
+.crop-grid-line.horizontal.second {
+  top: 66.666%;
+  left: 0;
+}
+.crop-handle,
+.crop-move-handle {
+  position: absolute;
+  z-index: 3;
+  min-width: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+.crop-handle::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: #9fe0bd;
+  border-style: solid;
+}
+.crop-handle.nw {
+  top: -24px;
+  left: -24px;
+}
+.crop-handle.nw::after {
+  right: 6px;
+  bottom: 6px;
+  border-width: 4px 0 0 4px;
+}
+.crop-handle.ne {
+  top: -24px;
+  right: -24px;
+}
+.crop-handle.ne::after {
+  bottom: 6px;
+  left: 6px;
+  border-width: 4px 4px 0 0;
+}
+.crop-handle.sw {
+  bottom: -24px;
+  left: -24px;
+}
+.crop-handle.sw::after {
+  top: 6px;
+  right: 6px;
+  border-width: 0 0 4px 4px;
+}
+.crop-handle.se {
+  right: -24px;
+  bottom: -24px;
+}
+.crop-handle.se::after {
+  top: 6px;
+  left: 6px;
+  border-width: 0 4px 4px 0;
+}
+.crop-move-handle {
+  top: 50%;
+  left: 50%;
+  width: auto;
+  min-width: 88px;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  background: rgb(12 24 18 / 76%);
+  color: #f5fff8;
+  font-size: 12px;
+  font-weight: 750;
+  transform: translate(-50%, -50%);
+}
+.crop-guide {
+  margin: 0 0 10px;
+  color: #cbd8d1;
+  font-size: 12px;
+  line-height: 1.45;
 }
 .cropper-tools {
   flex: 0 0 auto;
@@ -629,7 +773,7 @@ body.cropper-open {
 }
 .crop-ratios {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 .crop-ratios button {
@@ -695,7 +839,6 @@ body.cropper-open {
   .cropper-stage {
     min-width: 0;
     min-height: 0;
-    padding: 12px;
   }
   .cropper-tools {
     width: min(38vw, 300px);
@@ -708,7 +851,7 @@ body.cropper-open {
     border-left: 1px solid rgb(255 255 255 / 12%);
   }
   .crop-ratios {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .crop-status {
     min-height: 14px;

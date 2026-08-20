@@ -270,7 +270,7 @@
             <div>
               <span class="step">04</span>
               <h2>分类设置</h2>
-              <p>知识分类可继续加下级或删除；题型是独立维度。</p>
+              <p>知识分类按文件夹逻辑管理，可添加下级、重命名、移动和删除；旧错题会跟随分类变化。</p>
             </div>
           </div>
           <div id="mobileConfigCards" class="config-list"></div>
@@ -383,16 +383,35 @@
             <canvas
               id="cropCanvas"
               tabindex="0"
-              aria-label="裁剪区域，可拖动图片并使用缩放滑杆调整"
+              aria-label="图片区域：单指拖动图片，双指向外移动放大图片"
             ></canvas>
+            <div class="crop-selection" id="cropSelection" role="group" aria-label="可调整大小和位置的裁剪框">
+              <span class="crop-grid-line vertical first"></span>
+              <span class="crop-grid-line vertical second"></span>
+              <span class="crop-grid-line horizontal first"></span>
+              <span class="crop-grid-line horizontal second"></span>
+              <button class="crop-handle nw" data-crop-handle="nw" type="button" aria-label="拖动左上角调整裁剪框"></button>
+              <button class="crop-handle ne" data-crop-handle="ne" type="button" aria-label="拖动右上角调整裁剪框"></button>
+              <button class="crop-handle sw" data-crop-handle="sw" type="button" aria-label="拖动左下角调整裁剪框"></button>
+              <button class="crop-handle se" data-crop-handle="se" type="button" aria-label="拖动右下角调整裁剪框"></button>
+              <button id="cropMoveHandle" class="crop-move-handle" type="button" aria-label="拖动整个裁剪框">移动选框</button>
+            </div>
           </div>
           <div class="cropper-tools">
+            <p class="crop-guide">拖四角改变选框大小；拖“移动选框”调整位置；在图片上双指外扩放大。</p>
             <div class="crop-ratios" role="group" aria-label="裁剪比例">
               <button
                 class="active"
-                data-crop-ratio="source"
+                data-crop-ratio="free"
                 type="button"
                 aria-pressed="true"
+              >
+                自由
+              </button>
+              <button
+                data-crop-ratio="source"
+                type="button"
+                aria-pressed="false"
               >
                 原比例
               </button>

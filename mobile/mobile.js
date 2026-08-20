@@ -25,15 +25,17 @@ const cropState = {
   image: null,
   source: null,
   target: "question",
-  ratioMode: "source",
+  ratioMode: "free",
   viewportWidth: 0,
   viewportHeight: 0,
+  cropBox: { x: 0, y: 0, width: 120, height: 120 },
   minScale: 1,
   scale: 1,
   offsetX: 0,
   offsetY: 0,
   pointers: new Map(),
   gesture: null,
+  boxGesture: null,
   returnFocus: null,
 };
 
@@ -309,6 +311,7 @@ function loadImage(data) {
 }
 
 function cropRatio() {
+  if (cropState.ratioMode === "free") return null;
   if (cropState.ratioMode === "source") {
     return cropState.image.naturalWidth / cropState.image.naturalHeight;
   }
@@ -316,21 +319,20 @@ function cropRatio() {
 }
 
 function clampCropPosition() {
-  const position = CropUtils.clampPosition(
+  const position = CropUtils.clampImageToCropBox(
     cropState.offsetX,
     cropState.offsetY,
     cropState.image.naturalWidth,
     cropState.image.naturalHeight,
     cropState.scale,
-    cropState.viewportWidth,
-    cropState.viewportHeight,
+    cropState.cropBox,
   );
   cropState.offsetX = position.x;
   cropState.offsetY = position.y;
 }
 
 function syncCropZoom() {
-  const progress = Math.log(cropState.scale / cropState.minScale) / Math.log(4);
+  const progress = Math.log(cropState.scale / cropState.minScale) / Math.log(6);
   $("#cropZoom").value = String(Math.round(CropUtils.clamp(progress, 0, 1) * 100));
 }
 
@@ -358,55 +360,87 @@ function renderCropCanvas() {
     cropState.image.naturalWidth * cropState.scale,
     cropState.image.naturalHeight * cropState.scale,
   );
-  context.strokeStyle = "rgba(255, 255, 255, 0.38)";
-  context.lineWidth = 1;
-  context.beginPath();
-  for (const fraction of [1 / 3, 2 / 3]) {
-    context.moveTo(cropState.viewportWidth * fraction, 0);
-    context.lineTo(cropState.viewportWidth * fraction, cropState.viewportHeight);
-    context.moveTo(0, cropState.viewportHeight * fraction);
-    context.lineTo(cropState.viewportWidth, cropState.viewportHeight * fraction);
-  }
-  context.stroke();
+  const selection = $("#cropSelection");
+  selection.style.left = `${cropState.cropBox.x}px`;
+  selection.style.top = `${cropState.cropBox.y}px`;
+  selection.style.width = `${cropState.cropBox.width}px`;
+  selection.style.height = `${cropState.cropBox.height}px`;
 }
 
 function sizeCropViewport(reset = false) {
   if (!cropState.image || !$("#imageCropper").classList.contains("show")) return;
   const stage = $("#cropperStage").getBoundingClientRect();
-  const fitted = CropUtils.fitViewport(
-    Math.max(80, stage.width - 32),
-    Math.max(80, stage.height - 32),
-    cropRatio(),
-  );
   const oldWidth = cropState.viewportWidth;
   const oldHeight = cropState.viewportHeight;
   const oldScale = cropState.scale;
+  const oldBox = { ...cropState.cropBox };
   const oldCenterX = oldWidth
-    ? (oldWidth / 2 - cropState.offsetX) / oldScale
+    ? (oldBox.x + oldBox.width / 2 - cropState.offsetX) / oldScale
     : cropState.image.naturalWidth / 2;
   const oldCenterY = oldHeight
-    ? (oldHeight / 2 - cropState.offsetY) / oldScale
+    ? (oldBox.y + oldBox.height / 2 - cropState.offsetY) / oldScale
     : cropState.image.naturalHeight / 2;
   const oldZoom = cropState.minScale ? oldScale / cropState.minScale : 1;
-  cropState.viewportWidth = Math.max(1, fitted.width);
-  cropState.viewportHeight = Math.max(1, fitted.height);
+  cropState.viewportWidth = Math.max(1, stage.width);
+  cropState.viewportHeight = Math.max(1, stage.height);
+  if (reset || !oldWidth || !oldHeight) {
+    const ratio = cropRatio();
+    const availableWidth = Math.max(80, cropState.viewportWidth * 0.72);
+    const availableHeight = Math.max(80, cropState.viewportHeight * 0.72);
+    const freeSize = Math.max(
+      96,
+      Math.min(cropState.viewportWidth, cropState.viewportHeight) * 0.56,
+    );
+    const fitted = ratio
+      ? CropUtils.fitViewport(availableWidth, availableHeight, ratio)
+      : {
+          width: freeSize,
+          height: freeSize,
+        };
+    cropState.cropBox = {
+      x: (cropState.viewportWidth - fitted.width) / 2,
+      y: (cropState.viewportHeight - fitted.height) / 2,
+      width: fitted.width,
+      height: fitted.height,
+    };
+  } else {
+    const scaleX = cropState.viewportWidth / oldWidth;
+    const scaleY = cropState.viewportHeight / oldHeight;
+    cropState.cropBox = CropUtils.clampCropBox(
+      {
+        x: oldBox.x * scaleX,
+        y: oldBox.y * scaleY,
+        width: oldBox.width * scaleX,
+        height: oldBox.height * scaleY,
+      },
+      cropState.viewportWidth,
+      cropState.viewportHeight,
+      72,
+    );
+  }
   cropState.minScale = CropUtils.minimumScale(
     cropState.image.naturalWidth,
     cropState.image.naturalHeight,
-    cropState.viewportWidth,
-    cropState.viewportHeight,
+    cropState.cropBox.width,
+    cropState.cropBox.height,
   );
   cropState.scale = reset
     ? cropState.minScale
     : CropUtils.clamp(
         cropState.minScale * oldZoom,
         cropState.minScale,
-        cropState.minScale * 4,
+        cropState.minScale * 6,
       );
   const centerX = reset ? cropState.image.naturalWidth / 2 : oldCenterX;
   const centerY = reset ? cropState.image.naturalHeight / 2 : oldCenterY;
-  cropState.offsetX = cropState.viewportWidth / 2 - centerX * cropState.scale;
-  cropState.offsetY = cropState.viewportHeight / 2 - centerY * cropState.scale;
+  cropState.offsetX =
+    cropState.cropBox.x +
+    cropState.cropBox.width / 2 -
+    centerX * cropState.scale;
+  cropState.offsetY =
+    cropState.cropBox.y +
+    cropState.cropBox.height / 2 -
+    centerY * cropState.scale;
   clampCropPosition();
   syncCropZoom();
   renderCropCanvas();
@@ -416,7 +450,7 @@ function applyCropScale(scale, pointX, pointY) {
   const nextScale = CropUtils.clamp(
     scale,
     cropState.minScale,
-    cropState.minScale * 4,
+    cropState.minScale * 6,
   );
   const zoomed = CropUtils.zoomAtPoint(
     cropState,
@@ -432,18 +466,47 @@ function applyCropScale(scale, pointX, pointY) {
   renderCropCanvas();
 }
 
+function applyCropBox(nextBox) {
+  cropState.cropBox = CropUtils.clampCropBox(
+    nextBox,
+    cropState.viewportWidth,
+    cropState.viewportHeight,
+    72,
+  );
+  const nextMinimum = CropUtils.minimumScale(
+    cropState.image.naturalWidth,
+    cropState.image.naturalHeight,
+    cropState.cropBox.width,
+    cropState.cropBox.height,
+  );
+  cropState.minScale = nextMinimum;
+  if (cropState.scale < nextMinimum) {
+    applyCropScale(
+      nextMinimum,
+      cropState.cropBox.x + cropState.cropBox.width / 2,
+      cropState.cropBox.y + cropState.cropBox.height / 2,
+    );
+    return;
+  }
+  cropState.scale = Math.min(cropState.scale, cropState.minScale * 6);
+  clampCropPosition();
+  syncCropZoom();
+  renderCropCanvas();
+}
+
 async function openImageCropper(source, target = "question") {
   try {
     const image = await loadImage(source.data);
     cropState.image = image;
     cropState.source = { ...source };
     cropState.target = target;
-    cropState.ratioMode = "source";
+    cropState.ratioMode = "free";
     cropState.pointers.clear();
     cropState.gesture = null;
+    cropState.boxGesture = null;
     cropState.returnFocus = document.activeElement;
     $$("[data-crop-ratio]").forEach((button) => {
-      const active = button.dataset.cropRatio === "source";
+      const active = button.dataset.cropRatio === "free";
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     });
@@ -473,6 +536,7 @@ function closeImageCropper(restoreFocus = true) {
   document.body.classList.remove("cropper-open");
   cropState.pointers.clear();
   cropState.gesture = null;
+  cropState.boxGesture = null;
   ["#file", "#questionCameraFile", "#answerFile", "#answerCameraFile"].forEach(
     (selector) => {
       $(selector).value = "";
@@ -487,21 +551,21 @@ function canvasBlob(canvas, type, quality) {
 
 async function createCroppedFile() {
   const sourceX = CropUtils.clamp(
-    -cropState.offsetX / cropState.scale,
+    (cropState.cropBox.x - cropState.offsetX) / cropState.scale,
     0,
     cropState.image.naturalWidth,
   );
   const sourceY = CropUtils.clamp(
-    -cropState.offsetY / cropState.scale,
+    (cropState.cropBox.y - cropState.offsetY) / cropState.scale,
     0,
     cropState.image.naturalHeight,
   );
   const sourceWidth = Math.min(
-    cropState.viewportWidth / cropState.scale,
+    cropState.cropBox.width / cropState.scale,
     cropState.image.naturalWidth - sourceX,
   );
   const sourceHeight = Math.min(
-    cropState.viewportHeight / cropState.scale,
+    cropState.cropBox.height / cropState.scale,
     cropState.image.naturalHeight - sourceY,
   );
   const outputSize = CropUtils.outputSize(sourceWidth, sourceHeight);
@@ -588,6 +652,100 @@ function listAtPath(subject, parentPath) {
   return (
     findNode(mobileConfig[subject]?.knowledgeTree, parentPath)?.children || null
   );
+}
+
+function samePath(left, right) {
+  return (
+    Array.isArray(left) &&
+    Array.isArray(right) &&
+    left.length === right.length &&
+    left.every((part, index) => part === right[index])
+  );
+}
+
+function pathStartsWith(path, prefix) {
+  return (
+    Array.isArray(path) &&
+    Array.isArray(prefix) &&
+    prefix.length <= path.length &&
+    prefix.every((part, index) => path[index] === part)
+  );
+}
+
+function rebasePath(path, sourcePath, destinationPath) {
+  if (!pathStartsWith(path, sourcePath))
+    return Array.isArray(path) ? [...path] : [];
+  return [...destinationPath, ...path.slice(sourcePath.length)];
+}
+
+function flattenTree(tree, parents = []) {
+  return (Array.isArray(tree) ? tree : []).flatMap((item) => {
+    const path = [...parents, item.name];
+    return [{ item, path }, ...flattenTree(item.children, path)];
+  });
+}
+
+function renameTaxonomyNode(subject, path, nextName) {
+  const parent = path.slice(0, -1);
+  const list = listAtPath(subject, parent);
+  const clean = String(nextName || "").trim();
+  if (!list || !clean) return null;
+  const current = list.find((item) => item.name === path.at(-1));
+  if (!current || list.some((item) => item !== current && item.name === clean))
+    return null;
+  current.name = clean;
+  return [...parent, clean];
+}
+
+function moveTaxonomyNode(subject, sourcePath, destinationParentPath) {
+  if (pathStartsWith(destinationParentPath, sourcePath)) return null;
+  const sourceParent = sourcePath.slice(0, -1);
+  if (samePath(sourceParent, destinationParentPath)) return null;
+  const sourceList = listAtPath(subject, sourceParent);
+  const targetList = listAtPath(subject, destinationParentPath);
+  if (!sourceList || !targetList) return null;
+  const index = sourceList.findIndex((item) => item.name === sourcePath.at(-1));
+  if (index < 0) return null;
+  const moving = sourceList[index];
+  if (targetList.some((item) => item.name === moving.name)) return null;
+  sourceList.splice(index, 1);
+  targetList.push(moving);
+  return [...destinationParentPath, moving.name];
+}
+
+async function migrateMobileQuestionPaths(
+  subject,
+  sourcePath,
+  destinationPath,
+  collapse = false,
+) {
+  const rows = await questionsAll(true);
+  let changed = 0;
+  for (const item of rows) {
+    const currentPath =
+      item.knowledgePath || [item.module, item.unit].filter(Boolean);
+    if (
+      item.deletedAt ||
+      item.subject !== subject ||
+      !pathStartsWith(currentPath, sourcePath)
+    )
+      continue;
+    const knowledgePath = collapse
+      ? [...destinationPath]
+      : rebasePath(currentPath, sourcePath, destinationPath);
+    if (!knowledgePath.length) knowledgePath.push("未分类");
+    await questionPut({
+      ...item,
+      knowledgePath,
+      module: knowledgePath[0],
+      unit: knowledgePath[1] || "",
+      updatedAt: now(),
+      syncStatus: "pending",
+      lastError: "",
+    });
+    changed += 1;
+  }
+  return changed;
 }
 
 function readKnowledgePath() {
@@ -764,20 +922,22 @@ async function renderLibrary() {
       item.answerFile?.data && item.answerFile.type?.startsWith("image/")
         ? `<img class="answer-image" src="${esc(item.answerFile.data)}" alt="${esc(item.answerFile.name || "答案图片")}">`
         : "";
-    card.innerHTML = `<div class="question-card-head"><div><strong>${esc(item.title || "未命名错题")}</strong><p><span class="knowledge-chip">${esc(item.subject)} · ${esc(path)}</span><span class="type-chip">${esc(item.questionType || "未分类题型")}</span></p></div><span class="sync-state ${esc(item.syncStatus || "pending")}">${esc(statusText(item))}</span></div>${image}${attachment}<p class="question-stem">${esc(item.question || "题干保存在附件中")}</p><div class="answer-panel hidden"><strong>答案 / 解析</strong><p>${esc(item.answer || (answerImage ? "答案见图片" : "暂未填写"))}</p>${answerImage}</div><div class="queue-actions"><button class="secondary reveal-answer" type="button">查看答案</button><button class="secondary edit-question" type="button">编辑</button><button class="delete-question" type="button">删除</button></div>`;
+    card.innerHTML = `<div class="question-card-head"><div><strong>${esc(item.title || "未命名错题")}</strong><p><span class="knowledge-chip">${esc(item.subject)} · ${esc(path)}</span><span class="type-chip">${esc(item.questionType || "未分类题型")}</span></p></div><span class="sync-state ${esc(item.syncStatus || "pending")}">${esc(statusText(item))}</span></div>${image}${attachment}<p class="question-stem">${esc(item.question || "题干保存在附件中")}</p><div class="answer-panel hidden"><strong>答案 / 解析</strong><p>${esc(item.answer || (answerImage ? "答案见图片" : "暂未填写"))}</p>${answerImage}</div><div class="queue-actions"><button class="secondary reveal-answer" type="button">查看答案</button><button class="secondary move-question" type="button">移动分类</button><button class="secondary edit-question" type="button">编辑全部</button><button class="delete-question" type="button">删除</button></div>`;
     const answerPanel = card.querySelector(".answer-panel");
     const revealButton = card.querySelector(".reveal-answer");
     revealButton.onclick = () => {
       const hidden = answerPanel.classList.toggle("hidden");
       revealButton.textContent = hidden ? "查看答案" : "收起答案";
     };
+    card.querySelector(".move-question").onclick = () =>
+      editQuestion(item.id, true);
     card.querySelector(".edit-question").onclick = () => editQuestion(item.id);
     card.querySelector(".delete-question").onclick = () => removeQuestion(item);
     list.append(card);
   }
 }
 
-async function editQuestion(id) {
+async function editQuestion(id, focusClassification = false) {
   const item = await questionGet(id);
   if (!item || item.deletedAt) return;
   editingId = id;
@@ -824,6 +984,17 @@ async function editQuestion(id) {
   $("#submitBtn").textContent = "保存修改";
   $("#cancelEditBtn").classList.remove("hidden");
   switchView("captureView");
+  if (focusClassification) {
+    $("#formTitle").textContent = "移动错题到新分类";
+    $(".classification-fieldset")?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    setTimeout(() => $(".mobile-knowledge-level")?.focus(), 220);
+    message("选择后来新增的任意分类层级，再点“保存修改”即可", true);
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
 
 async function removeQuestion(item) {
@@ -850,16 +1021,37 @@ async function removeQuestion(item) {
   );
 }
 
+function taxonomyDestinationOptions(subject, sourcePath) {
+  const sourceParent = sourcePath.slice(0, -1);
+  return [
+    { path: [], label: `${subject}（根目录）` },
+    ...flattenTree(mobileConfig[subject]?.knowledgeTree).map((entry) => ({
+      path: entry.path,
+      label: entry.path.join(" › "),
+    })),
+  ]
+    .filter(
+      (target) =>
+        !samePath(target.path, sourceParent) &&
+        !pathStartsWith(target.path, sourcePath),
+    )
+    .map(
+      (target) =>
+        `<option value="${esc(encodeURIComponent(JSON.stringify(target.path)))}">${esc(target.label)}</option>`,
+    )
+    .join("");
+}
+
 function taxonomyNodeHtml(subject, item, parents = []) {
   const path = [...parents, item.name];
   const encoded = encodeURIComponent(JSON.stringify(path));
-  return `<li><div class="taxonomy-row"><span class="knowledge-chip">${esc(item.name)}</span><span><button class="mini-action add-child" data-subject="${esc(subject)}" data-path="${encoded}" type="button">加下级</button><button class="mini-action danger delete-node" data-subject="${esc(subject)}" data-path="${encoded}" type="button">删除</button></span></div>${item.children?.length ? `<ul>${item.children.map((child) => taxonomyNodeHtml(subject, child, path)).join("")}</ul>` : ""}</li>`;
+  return `<li><div class="taxonomy-row"><span class="knowledge-chip">${esc(item.name)}</span><span><button class="mini-action add-child" data-subject="${esc(subject)}" data-path="${encoded}" type="button">加下级</button><button class="mini-action rename-node" data-subject="${esc(subject)}" data-path="${encoded}" type="button">重命名</button><button class="mini-action move-node" data-subject="${esc(subject)}" data-path="${encoded}" type="button" aria-expanded="false">移动</button><button class="mini-action danger delete-node" data-subject="${esc(subject)}" data-path="${encoded}" type="button">删除</button></span></div><div class="taxonomy-move-panel" hidden><label>移动到<select class="taxonomy-move-target">${taxonomyDestinationOptions(subject, path)}</select></label><div><button class="mini-action cancel-node-move" type="button">取消</button><button class="mini-action confirm-node-move" data-subject="${esc(subject)}" data-path="${encoded}" type="button">确认移动</button></div></div>${item.children?.length ? `<ul>${item.children.map((child) => taxonomyNodeHtml(subject, child, path)).join("")}</ul>` : ""}</li>`;
 }
 
 function renderConfig() {
   $("#mobileConfigCards").innerHTML = ACTIVE_SUBJECTS.map((subject) => {
     const config = mobileConfig[subject];
-    return `<article class="taxonomy-card"><div class="taxonomy-title"><strong>${esc(subject)}</strong><button class="mini-action add-root" data-subject="${esc(subject)}" type="button">加知识大类</button></div><ul class="taxonomy-tree">${config.knowledgeTree.map((item) => taxonomyNodeHtml(subject, item)).join("") || '<li class="hint">暂无知识分类</li>'}</ul><div class="type-list"><strong>题型</strong><div>${config.questionTypes.map((type) => `<span class="type-chip">${esc(type)} <button class="delete-type" data-subject="${esc(subject)}" data-type="${esc(type)}" aria-label="删除${esc(type)}" type="button">×</button></span>`).join("") || '<span class="hint">暂无题型</span>'}</div><button class="mini-action add-type" data-subject="${esc(subject)}" type="button">加题型</button></div></article>`;
+    return `<article class="taxonomy-card"><div class="taxonomy-title"><div><strong>${esc(subject)}</strong><p class="hint">分类像文件夹一样管理，旧错题会跟随移动。</p></div><button class="mini-action add-root" data-subject="${esc(subject)}" type="button">加知识大类</button></div><ul class="taxonomy-tree">${config.knowledgeTree.map((item) => taxonomyNodeHtml(subject, item)).join("") || '<li class="hint">暂无知识分类</li>'}</ul><div class="type-list"><strong>题型</strong><div>${config.questionTypes.map((type) => `<span class="type-chip">${esc(type)} <button class="delete-type" data-subject="${esc(subject)}" data-type="${esc(type)}" aria-label="删除${esc(type)}" type="button">×</button></span>`).join("") || '<span class="hint">暂无题型</span>'}</div><button class="mini-action add-type" data-subject="${esc(subject)}" type="button">加题型</button></div></article>`;
   }).join("");
   $$(".add-root,.add-child").forEach((button) => {
     button.onclick = async () => {
@@ -881,19 +1073,120 @@ function renderConfig() {
     };
   });
   $$(".delete-node").forEach((button) => {
-    button.onclick = () => {
+    button.onclick = async () => {
       const path = JSON.parse(decodeURIComponent(button.dataset.path));
+      const affected = (await questionsAll()).filter(
+        (item) =>
+          item.subject === button.dataset.subject &&
+          pathStartsWith(
+            item.knowledgePath || [item.module, item.unit].filter(Boolean),
+            path,
+          ),
+      ).length;
       if (
         !confirm(
-          `删除「${path.join(" · ")}」及所有下级？已有错题仍保留原分类文字。`,
+          `删除「${path.join(" · ")}」及所有下级？${affected ? `其中 ${affected} 道旧错题会安全移动到上一级。` : "当前没有关联错题。"}`,
         )
       )
         return;
       const list = listAtPath(button.dataset.subject, path.slice(0, -1));
       const index = list?.findIndex((item) => item.name === path.at(-1));
       if (index >= 0) list.splice(index, 1);
+      const parent = path.slice(0, -1);
+      await migrateMobileQuestionPaths(
+        button.dataset.subject,
+        path,
+        parent.length ? parent : ["未分类"],
+        true,
+      );
       saveConfig(true);
       refreshConfigUi();
+      await renderAll();
+      message(
+        affected
+          ? `分类已删除，${affected} 道错题已移到上一级`
+          : "知识分类已删除",
+        true,
+      );
+    };
+  });
+  $$(".rename-node").forEach((button) => {
+    button.onclick = async () => {
+      const path = JSON.parse(decodeURIComponent(button.dataset.path));
+      const name = await askText(
+        "重命名知识分类",
+        `当前位置：${button.dataset.subject} · ${path.join(" · ")}；原名称：${path.at(-1)}`,
+      );
+      if (!name?.trim() || name.trim() === path.at(-1)) return;
+      const nextPath = renameTaxonomyNode(
+        button.dataset.subject,
+        path,
+        name,
+      );
+      if (!nextPath) return message("名称重复或分类已不存在");
+      const changed = await migrateMobileQuestionPaths(
+        button.dataset.subject,
+        path,
+        nextPath,
+      );
+      saveConfig(true);
+      refreshConfigUi();
+      await renderAll();
+      message(
+        `分类已重命名${changed ? `，${changed} 道旧错题已同步更新` : ""}`,
+        true,
+      );
+    };
+  });
+  $$(".move-node").forEach((button) => {
+    button.onclick = () => {
+      const panel = button
+        .closest("li")
+        .querySelector(":scope > .taxonomy-move-panel");
+      const opening = panel.hidden;
+      $$(".taxonomy-move-panel").forEach((item) => (item.hidden = true));
+      $$(".move-node").forEach((item) =>
+        item.setAttribute("aria-expanded", "false"),
+      );
+      panel.hidden = !opening;
+      button.setAttribute("aria-expanded", String(opening));
+      if (opening) panel.querySelector("select")?.focus();
+    };
+  });
+  $$(".cancel-node-move").forEach((button) => {
+    button.onclick = () => {
+      button.closest(".taxonomy-move-panel").hidden = true;
+    };
+  });
+  $$(".confirm-node-move").forEach((button) => {
+    button.onclick = async () => {
+      const path = JSON.parse(decodeURIComponent(button.dataset.path));
+      const target = JSON.parse(
+        decodeURIComponent(
+          button
+            .closest(".taxonomy-move-panel")
+            .querySelector("select").value,
+        ),
+      );
+      const nextPath = moveTaxonomyNode(
+        button.dataset.subject,
+        path,
+        target,
+      );
+      if (!nextPath)
+        return message("无法移动：目标重复、无效或位于当前分类内部");
+      const changed = await migrateMobileQuestionPaths(
+        button.dataset.subject,
+        path,
+        nextPath,
+      );
+      saveConfig(true);
+      refreshConfigUi();
+      await renderAll();
+      message(
+        `分类已移动${changed ? `，${changed} 道旧错题已一起移动` : ""}`,
+        true,
+      );
     };
   });
   $$(".add-type").forEach((button) => {
@@ -1414,9 +1707,9 @@ $$("[data-crop-ratio]").forEach((button) => {
 $("#cropZoom").oninput = (event) => {
   const progress = Number(event.target.value) / 100;
   applyCropScale(
-    cropState.minScale * 4 ** progress,
-    cropState.viewportWidth / 2,
-    cropState.viewportHeight / 2,
+    cropState.minScale * 6 ** progress,
+    cropState.cropBox.x + cropState.cropBox.width / 2,
+    cropState.cropBox.y + cropState.cropBox.height / 2,
   );
 };
 $("#confirmCropBtn").onclick = async () => {
@@ -1458,6 +1751,61 @@ $("#confirmCropBtn").onclick = async () => {
     button.textContent = "确认裁剪";
   }
 };
+
+function bindCropBoxDrag(element, mode, handle = "") {
+  element.onpointerdown = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    element.setPointerCapture(event.pointerId);
+    cropState.boxGesture = {
+      pointerId: event.pointerId,
+      mode,
+      handle,
+      startX: event.clientX,
+      startY: event.clientY,
+      box: { ...cropState.cropBox },
+    };
+  };
+  element.onpointermove = (event) => {
+    const gesture = cropState.boxGesture;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    const nextBox =
+      gesture.mode === "move"
+        ? CropUtils.moveCropBox(
+            gesture.box,
+            deltaX,
+            deltaY,
+            cropState.viewportWidth,
+            cropState.viewportHeight,
+          )
+        : CropUtils.resizeCropBox(
+            gesture.box,
+            gesture.handle,
+            deltaX,
+            deltaY,
+            cropState.viewportWidth,
+            cropState.viewportHeight,
+            72,
+            cropRatio(),
+          );
+    applyCropBox(nextBox);
+  };
+  const end = (event) => {
+    if (cropState.boxGesture?.pointerId === event.pointerId)
+      cropState.boxGesture = null;
+  };
+  element.onpointerup = end;
+  element.onpointercancel = end;
+}
+
+$$("[data-crop-handle]").forEach((handle) =>
+  bindCropBoxDrag(handle, "resize", handle.dataset.cropHandle),
+);
+bindCropBoxDrag($("#cropMoveHandle"), "move");
+
 const cropCanvas = $("#cropCanvas");
 cropCanvas.onpointerdown = (event) => {
   const point = cropPointerPoint(event);
@@ -1487,7 +1835,7 @@ cropCanvas.onpointermove = (event) => {
     const scale = CropUtils.clamp(
       cropState.gesture.scale * (distance / cropState.gesture.distance),
       cropState.minScale,
-      cropState.minScale * 4,
+      cropState.minScale * 6,
     );
     const factor = scale / cropState.gesture.scale;
     cropState.scale = scale;
@@ -1533,8 +1881,8 @@ cropCanvas.onkeydown = (event) => {
     event.preventDefault();
     applyCropScale(
       cropState.scale * (["+", "="].includes(event.key) ? 1.08 : 0.92),
-      cropState.viewportWidth / 2,
-      cropState.viewportHeight / 2,
+      cropState.cropBox.x + cropState.cropBox.width / 2,
+      cropState.cropBox.y + cropState.cropBox.height / 2,
     );
   }
 };

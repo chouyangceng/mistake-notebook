@@ -232,7 +232,7 @@
               <p class="eyebrow">CONFIGURATION</p>
               <h2>科目配置</h2>
               <p class="muted">
-                蓝色是可继续分级的知识分类，红色是与知识路径并行的题型。两者都可添加和删除。
+                蓝色知识分类按文件夹逻辑管理，可添加下级、重命名、移动和删除；旧错题会跟随分类移动。红色题型与知识路径并行。
               </p>
             </div>
           </div>
@@ -443,7 +443,7 @@
         <div class="modal-head">
           <div>
             <p class="eyebrow">分类编辑</p>
-            <h2>修改归类</h2>
+            <h2>移动 / 修改归类</h2>
           </div>
           <button class="close-btn" id="closeClassification">关闭</button>
         </div>
@@ -481,7 +481,7 @@
               placeholder="计算错误, 审题失误"
           /></label>
           <div class="form-foot">
-            <span class="muted">仅修改归类，不改题干和答案</span
+            <span class="muted">可把以前录入的错题移动到后来新增的任意层级，不改题干和答案</span
             ><button class="primary-btn" type="submit">保存归类</button>
           </div>
         </form>

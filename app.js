@@ -36,8 +36,14 @@ const {
   normalizeConfig,
   normalizePath,
   findNode,
+  flattenTree,
+  samePath,
+  pathStartsWith,
+  rebasePath,
   addNode,
   removeNode,
+  renameNode,
+  moveNode,
 } = ShitiTaxonomy;
 const defaultSubjectConfig = subjectDefaults();
 let subjectConfig = normalizeConfig(
@@ -873,10 +879,56 @@ function updateModuleSelect(path = []) {
     Array.isArray(path) ? path : [],
   );
 }
+function migrateQuestionClassificationPaths(
+  subject,
+  sourcePath,
+  destinationPath,
+  collapse = false,
+) {
+  let changed = 0;
+  for (const question of questions) {
+    if (
+      question.deletedAt ||
+      question.subject !== subject ||
+      !pathStartsWith(question.knowledgePath, sourcePath)
+    )
+      continue;
+    question.knowledgePath = collapse
+      ? [...destinationPath]
+      : rebasePath(question.knowledgePath, sourcePath, destinationPath);
+    if (!question.knowledgePath.length) question.knowledgePath = ["未分类"];
+    question.module = question.knowledgePath[0];
+    question.unit = question.knowledgePath[1] || "";
+    touch(question);
+    changed += 1;
+  }
+  if (changed) saveQuestions();
+  return changed;
+}
+function taxonomyDestinationOptions(subject, sourcePath) {
+  const sourceParent = sourcePath.slice(0, -1);
+  const destinations = [
+    { path: [], label: `${subject}（根目录）` },
+    ...flattenTree(subjectConfig[subject]?.knowledgeTree).map((entry) => ({
+      path: entry.path,
+      label: entry.path.join(" › "),
+    })),
+  ].filter(
+    (entry) =>
+      !samePath(entry.path, sourceParent) &&
+      !pathStartsWith(entry.path, sourcePath),
+  );
+  return destinations
+    .map(
+      (entry) =>
+        `<option value="${esc(encodeURIComponent(JSON.stringify(entry.path)))}">${esc(entry.label)}</option>`,
+    )
+    .join("");
+}
 function taxonomyNodeHtml(subject, node, path) {
   let full = [...path, node.name],
     encoded = encodeURIComponent(JSON.stringify(full));
-  return `<li><div class="taxonomy-node"><span class="taxonomy-pill knowledge-pill">知识 · ${esc(node.name)}</span><span class="taxonomy-actions"><button class="ghost-btn add-child" data-subject="${esc(subject)}" data-path="${encoded}">加下级</button><button class="danger-text delete-node" data-subject="${esc(subject)}" data-path="${encoded}">删除</button></span></div>${node.children?.length ? `<ul>${node.children.map((child) => taxonomyNodeHtml(subject, child, full)).join("")}</ul>` : ""}</li>`;
+  return `<li><div class="taxonomy-node"><span class="taxonomy-pill knowledge-pill">知识 · ${esc(node.name)}</span><span class="taxonomy-actions"><button class="ghost-btn add-child" data-subject="${esc(subject)}" data-path="${encoded}">加下级</button><button class="ghost-btn rename-node" data-subject="${esc(subject)}" data-path="${encoded}">重命名</button><button class="ghost-btn move-node" data-subject="${esc(subject)}" data-path="${encoded}" aria-expanded="false">移动</button><button class="danger-text delete-node" data-subject="${esc(subject)}" data-path="${encoded}">删除</button></span></div><div class="taxonomy-move-panel" hidden><label>移动到<select class="taxonomy-move-target">${taxonomyDestinationOptions(subject, full)}</select></label><div><button class="ghost-btn cancel-node-move" type="button">取消</button><button class="primary-btn confirm-node-move" data-subject="${esc(subject)}" data-path="${encoded}" type="button">确认移动</button></div></div>${node.children?.length ? `<ul>${node.children.map((child) => taxonomyNodeHtml(subject, child, full)).join("")}</ul>` : ""}</li>`;
 }
 function renderConfig() {
   if (!$("#subjectConfigCards")) return;
@@ -884,7 +936,7 @@ function renderConfig() {
   $("#subjectConfigCards").innerHTML = subjects()
     .map((subject) => {
       let config = subjectConfig[subject];
-      return `<article class="taxonomy-card"><div class="taxonomy-head"><div><strong>${esc(subject)}</strong><p>知识分类可继续分级；题型与知识路径互不从属。</p></div><button class="ghost-btn add-root" data-subject="${esc(subject)}">加知识大类</button></div><ul class="taxonomy-tree">${config.knowledgeTree.map((node) => taxonomyNodeHtml(subject, node, [])).join("") || '<li class="muted">暂无知识分类</li>'}</ul><div class="type-config"><strong>题型</strong><div>${config.questionTypes.map((type) => `<span class="taxonomy-pill type-pill">题型 · ${esc(type)} <button class="delete-type" data-subject="${esc(subject)}" data-type="${esc(type)}" aria-label="删除${esc(type)}">×</button></span>`).join("") || '<span class="muted">该科目不区分题型</span>'}</div><button class="ghost-btn add-type" data-subject="${esc(subject)}">加题型</button></div></article>`;
+      return `<article class="taxonomy-card"><div class="taxonomy-head"><div><strong>${esc(subject)}</strong><p>像文件夹一样添加、重命名和移动；分类变化时旧错题会自动跟随。</p></div><button class="ghost-btn add-root" data-subject="${esc(subject)}">加知识大类</button></div><ul class="taxonomy-tree">${config.knowledgeTree.map((node) => taxonomyNodeHtml(subject, node, [])).join("") || '<li class="muted">暂无知识分类</li>'}</ul><div class="type-config"><strong>题型</strong><div>${config.questionTypes.map((type) => `<span class="taxonomy-pill type-pill">题型 · ${esc(type)} <button class="delete-type" data-subject="${esc(subject)}" data-type="${esc(type)}" aria-label="删除${esc(type)}">×</button></span>`).join("") || '<span class="muted">该科目不区分题型</span>'}</div><button class="ghost-btn add-type" data-subject="${esc(subject)}">加题型</button></div></article>`;
     })
     .join("");
   let tags = [
@@ -922,17 +974,92 @@ function renderConfig() {
     (b) =>
       (b.onclick = () => {
         let path = JSON.parse(decodeURIComponent(b.dataset.path));
-        if (
-          !confirm(
-            `确定删除知识分类「${path.join(" · ")}」及其所有下级吗？\n已有题目会保留原分类文字。`,
-          )
-        )
+        let affected = questions.filter(
+          (question) =>
+            !question.deletedAt &&
+            question.subject === b.dataset.subject &&
+            pathStartsWith(question.knowledgePath, path),
+        ).length;
+        if (!confirm(`确定删除知识分类「${path.join(" · ")}」及其所有下级吗？\n${affected ? `其中 ${affected} 道旧错题会安全移动到上一级。` : "当前没有关联错题。"}`))
           return;
         if (removeNode(subjectConfig, b.dataset.subject, path)) {
+          let parent = path.slice(0, -1);
+          migrateQuestionClassificationPaths(
+            b.dataset.subject,
+            path,
+            parent.length ? parent : ["未分类"],
+            true,
+          );
           saveSubjectConfig();
           render();
-          toast("知识分类已删除");
+          toast(affected ? `分类已删除，${affected} 道错题已移到上一级` : "知识分类已删除");
         }
+      }),
+  );
+  $$(".rename-node").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        let path = JSON.parse(decodeURIComponent(b.dataset.path));
+        let name = await askText(
+          "重命名知识分类",
+          `当前位置：${b.dataset.subject} · ${path.join(" · ")}`,
+          path.at(-1),
+        );
+        if (!name?.trim() || name.trim() === path.at(-1)) return;
+        let nextPath = renameNode(
+          subjectConfig,
+          b.dataset.subject,
+          path,
+          name,
+        );
+        if (!nextPath) return toast("名称重复或分类已不存在");
+        let changed = migrateQuestionClassificationPaths(
+          b.dataset.subject,
+          path,
+          nextPath,
+        );
+        saveSubjectConfig();
+        render();
+        toast(`分类已重命名${changed ? `，${changed} 道旧错题已同步更新` : ""}`);
+      }),
+  );
+  $$(".move-node").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let panel = b.closest("li").querySelector(":scope > .taxonomy-move-panel");
+        let opening = panel.hidden;
+        $$(".taxonomy-move-panel").forEach((item) => (item.hidden = true));
+        $$(".move-node").forEach((item) => item.setAttribute("aria-expanded", "false"));
+        panel.hidden = !opening;
+        b.setAttribute("aria-expanded", String(opening));
+        if (opening) panel.querySelector("select")?.focus();
+      }),
+  );
+  $$(".cancel-node-move").forEach(
+    (b) =>
+      (b.onclick = () => {
+        b.closest(".taxonomy-move-panel").hidden = true;
+      }),
+  );
+  $$(".confirm-node-move").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let path = JSON.parse(decodeURIComponent(b.dataset.path));
+        let target = JSON.parse(
+          decodeURIComponent(
+            b.closest(".taxonomy-move-panel").querySelector("select").value,
+          ),
+        );
+        let nextPath = moveNode(subjectConfig, b.dataset.subject, path, target);
+        if (!nextPath) return toast("无法移动：目标重复、无效或位于当前分类内部");
+        let changed = migrateQuestionClassificationPaths(
+          b.dataset.subject,
+          path,
+          nextPath,
+        );
+        saveSubjectConfig();
+        render();
+        toast(`分类已移动${changed ? `，${changed} 道旧错题已一起移动` : ""}`);
       }),
   );
   $$(".add-type").forEach(

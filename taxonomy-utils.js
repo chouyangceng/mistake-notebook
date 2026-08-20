@@ -136,6 +136,32 @@
     if (!parentPath.length) return tree;
     return findNode(tree, parentPath)?.children || null;
   }
+  function samePath(left, right) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((part, index) => part === right[index])
+    );
+  }
+  function pathStartsWith(path, prefix) {
+    return (
+      Array.isArray(path) &&
+      Array.isArray(prefix) &&
+      prefix.length <= path.length &&
+      prefix.every((part, index) => path[index] === part)
+    );
+  }
+  function rebasePath(path, sourcePath, destinationPath) {
+    if (!pathStartsWith(path, sourcePath)) return Array.isArray(path) ? [...path] : [];
+    return [...destinationPath, ...path.slice(sourcePath.length)];
+  }
+  function flattenTree(tree, parents = []) {
+    return (Array.isArray(tree) ? tree : []).flatMap((item) => {
+      const path = [...parents, item.name];
+      return [{ node: item, path }, ...flattenTree(item.children, path)];
+    });
+  }
   function addNode(config, subject, parentPath, name) {
     const clean = String(name || "").trim();
     if (!clean) return false;
@@ -156,6 +182,44 @@
     list.splice(index, 1);
     return true;
   }
+  function renameNode(config, subject, path, nextName) {
+    if (!Array.isArray(path) || !path.length) return null;
+    const clean = String(nextName || "").trim();
+    if (!clean) return null;
+    const parentPath = path.slice(0, -1);
+    const list = getListAtPath(config?.[subject]?.knowledgeTree, parentPath);
+    if (!list) return null;
+    const current = list.find((item) => item.name === path.at(-1));
+    if (!current || list.some((item) => item !== current && item.name === clean))
+      return null;
+    current.name = clean;
+    return [...parentPath, clean];
+  }
+  function moveNode(config, subject, sourcePath, destinationParentPath = []) {
+    if (!Array.isArray(sourcePath) || !sourcePath.length) return null;
+    const targetPath = Array.isArray(destinationParentPath)
+      ? destinationParentPath
+      : [];
+    if (pathStartsWith(targetPath, sourcePath)) return null;
+    const sourceParent = sourcePath.slice(0, -1);
+    if (samePath(sourceParent, targetPath)) return null;
+    const sourceList = getListAtPath(
+      config?.[subject]?.knowledgeTree,
+      sourceParent,
+    );
+    const targetList = getListAtPath(
+      config?.[subject]?.knowledgeTree,
+      targetPath,
+    );
+    if (!sourceList || !targetList) return null;
+    const index = sourceList.findIndex((item) => item.name === sourcePath.at(-1));
+    if (index < 0) return null;
+    const moving = sourceList[index];
+    if (targetList.some((item) => item.name === moving.name)) return null;
+    sourceList.splice(index, 1);
+    targetList.push(moving);
+    return [...targetPath, moving.name];
+  }
   return {
     ACTIVE_SUBJECTS,
     CONFIG_SCHEMA_VERSION,
@@ -164,7 +228,13 @@
     normalizePath,
     findNode,
     getListAtPath,
+    flattenTree,
+    samePath,
+    pathStartsWith,
+    rebasePath,
     addNode,
     removeNode,
+    renameNode,
+    moveNode,
   };
 });
