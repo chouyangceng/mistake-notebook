@@ -51,7 +51,10 @@ let subjectConfig = normalizeConfig(
 );
 let questions = read("shiti-questions", seed),
   currentSubject = "全部",
-  pendingAttachment = null;
+  pendingAttachment = null,
+  pendingAnswerAttachment = null,
+  pendingImageSource = null,
+  pendingAnswerImageSource = null;
 let editingClassificationId = null;
 let textPromptResolver = null;
 let plan = read("shiti-plan", { dailyTotal: 6, rows: {} }),
@@ -758,23 +761,37 @@ function renderFilters() {
 function safeAssetUrl(data) {
   return String(data || "").startsWith("data:") ? esc(data) : "";
 }
-function attachment(q) {
-  let a = q.attachment;
+function questionAttachment(q) {
+  return q.attachment || q.file || q.remoteAttachment || null;
+}
+function answerAttachment(q) {
+  return q.answerAttachment || q.answerFile || q.remoteAnswerAttachment || null;
+}
+function attachment(q, role = "question") {
+  let a = role === "answer" ? answerAttachment(q) : questionAttachment(q);
   if (!a) return "";
   if (a.data && a.type?.startsWith("image/")) {
     let url = safeAssetUrl(a.data);
     return url
-      ? `<div class="attachment-card"><img src="${url}" alt="${esc(a.name)}"></div>`
-      : `<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;
+      ? `<div class="attachment-card"><img src="${url}" alt="${esc(a.name || (role === "answer" ? "答案图片" : "题目图片"))}"></div>`
+      : `<div class="attachment-card" data-asset="${esc(a.id)}" data-asset-role="${role}"><span>图片</span><b>${esc(a.name)}</b></div>`;
   }
   if (a.type?.startsWith("image/"))
-    return `<div class="attachment-card" data-asset="${esc(a.id)}"><span>图片</span><b>${esc(a.name)}</b></div>`;
+    return `<div class="attachment-card" data-asset="${esc(a.id)}" data-asset-role="${role}"><span>图片</span><b>${esc(a.name)}</b></div>`;
   return `<div class="attachment-card"><span>PDF</span><b>${esc(a.name)}</b></div>`;
 }
 async function loadAttachments() {
   $$("[data-asset]").forEach(async (e) => {
-    let q = questions.find((x) => x.attachment?.id === e.dataset.asset),
-      meta = q?.attachment || {};
+    let role = e.dataset.assetRole || "question",
+      q = questions.find((x) =>
+        [questionAttachment(x)?.id, answerAttachment(x)?.id].includes(
+          e.dataset.asset,
+        ),
+      ),
+      meta =
+        role === "answer"
+          ? answerAttachment(q || {}) || {}
+          : questionAttachment(q || {}) || {};
     let a = await getAsset(e.dataset.asset).catch(() => null);
     if (a?.data && a.type.startsWith("image/")) {
       let url = safeAssetUrl(a.data);
@@ -1207,7 +1224,7 @@ function card(q) {
   let r = recordInfo(q),
     idAttr = esc(String(q.id)),
     path = (q.knowledgePath || []).join(" › ");
-  return `<article class="question-card"><div class="q-meta"><span class="tag">${esc(q.subject)}</span><span class="knowledge-pill compact-pill">知识 · ${esc(path || "未分类")}</span>${q.questionType && q.questionType !== "不区分题型" ? `<span class="type-pill compact-pill">题型 · ${esc(q.questionType)}</span>` : ""}</div><h3>${esc(q.title)}</h3><p class="excerpt">${esc(q.question)}</p>${attachment(q)}<div class="card-foot"><div></div><button class="ghost-btn record-btn" data-id="${idAttr}" aria-expanded="${q.recordOpen ? "true" : "false"}">${q.recordOpen ? "收起档案" : "查看档案"}</button><button class="ghost-btn classify-btn" data-id="${idAttr}">修改归类</button><button class="reveal-btn" data-id="${idAttr}">${q.revealed ? "收起答案" : "查看答案"}</button><button class="del-btn" data-id="${idAttr}" title="删除这道错题">删除</button></div>${
+  return `<article class="question-card"><div class="q-meta"><span class="tag">${esc(q.subject)}</span><span class="knowledge-pill compact-pill">知识 · ${esc(path || "未分类")}</span>${q.questionType && q.questionType !== "不区分题型" ? `<span class="type-pill compact-pill">题型 · ${esc(q.questionType)}</span>` : ""}</div><h3>${esc(q.title)}</h3><p class="excerpt">${esc(q.question || (questionAttachment(q) ? "题干见附件" : "暂未填写题干"))}</p>${attachment(q)}<div class="card-foot"><div></div><button class="ghost-btn record-btn" data-id="${idAttr}" aria-expanded="${q.recordOpen ? "true" : "false"}">${q.recordOpen ? "收起档案" : "查看档案"}</button><button class="ghost-btn classify-btn" data-id="${idAttr}">修改归类</button><button class="reveal-btn" data-id="${idAttr}">${q.revealed ? "收起答案" : "查看答案"}</button><button class="del-btn" data-id="${idAttr}" title="删除这道错题">删除</button></div>${
     q.recordOpen
       ? `<div class="answer-box"><strong>题目档案</strong><div class="reflection">入库日期：${esc(r.created)}<br>分类层级：${r.levels} 级<br>标签总数：${r.labelCount} 个</div><div class="topic-pills">${[
           q.subject,
@@ -1220,7 +1237,7 @@ function card(q) {
           .map((t) => `<span>${esc(t)}</span>`)
           .join("")}</div></div>`
       : ""
-  }${q.revealed ? `<div class="answer-box"><strong>答案与解析</strong>${esc(q.answer) || "暂未填写答案。"}${q.conclusion ? `<div class="reflection"><b>奥技 / 结论：</b>${esc(q.conclusion)}</div>` : ""}${q.reflection ? `<div class="reflection"><b>我的反思：</b>${esc(q.reflection)}</div>` : ""}</div>` : ""}</article>`;
+  }${q.revealed ? `<div class="answer-box"><strong>答案与解析</strong>${esc(q.answer) || (answerAttachment(q) ? "答案见图片。" : "暂未填写答案。")}${attachment(q, "answer")}${q.conclusion ? `<div class="reflection"><b>奥技 / 结论：</b>${esc(q.conclusion)}</div>` : ""}${q.reflection ? `<div class="reflection"><b>我的反思：</b>${esc(q.reflection)}</div>` : ""}</div>` : ""}</article>`;
 }
 function bindCards() {
   $$(".record-btn").forEach(
@@ -1293,6 +1310,8 @@ async function deleteQuestion(questionId) {
   for (let key of Object.keys(done))
     done[key] = (done[key] || []).filter((itemId) => String(itemId) !== id);
   if (q.attachment?.id) deleteAsset(q.attachment.id).catch(() => {});
+  if (q.answerAttachment?.id)
+    deleteAsset(q.answerAttachment.id).catch(() => {});
   saveQuestions();
   save("shiti-done", done);
   render();
@@ -1477,26 +1496,164 @@ $("#textPromptForm").onsubmit = (event) => {
   closeTextPrompt($("#textPromptInput").value.trim());
 };
 $("#classificationForm").onsubmit = saveClassificationForm;
+function fileData(file) {
+  return new Promise((resolve, reject) => {
+    let reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+function pendingFor(target) {
+  return target === "answer" ? pendingAnswerAttachment : pendingAttachment;
+}
+function sourceFor(target) {
+  return target === "answer" ? pendingAnswerImageSource : pendingImageSource;
+}
+function setPending(target, asset, source = null) {
+  if (target === "answer") {
+    pendingAnswerAttachment = asset;
+    pendingAnswerImageSource = source;
+  } else {
+    pendingAttachment = asset;
+    pendingImageSource = source;
+  }
+  renderPendingAttachment(target);
+}
+function renderPendingAttachment(target) {
+  let isAnswer = target === "answer",
+    asset = pendingFor(target),
+    source = sourceFor(target),
+    preview = $(isAnswer ? "#answerAttachmentPreview" : "#attachmentPreview"),
+    removeButton = $(
+      isAnswer ? "#removeAnswerAttachment" : "#removeQuestionAttachment",
+    );
+  preview.innerHTML = "";
+  removeButton.classList.toggle("hidden", !asset);
+  if (!asset) return;
+  if (asset.type?.startsWith("image/") && safeAssetUrl(asset.data)) {
+    let image = document.createElement("img");
+    image.src = asset.data;
+    image.alt = isAnswer ? "答案图片预览" : "题目图片预览";
+    preview.append(image);
+  }
+  let meta = document.createElement("div"),
+    name = document.createElement("span");
+  meta.className = "attachment-preview-meta";
+  name.textContent = asset.type?.startsWith("image/")
+    ? asset.name
+    : `PDF 已附加：${asset.name}`;
+  meta.append(name);
+  if (source && asset.type?.startsWith("image/")) {
+    let recrop = document.createElement("button");
+    recrop.type = "button";
+    recrop.className = "recrop-attachment";
+    recrop.textContent = "重新裁剪";
+    recrop.onclick = () => openAttachmentCropper(source, target);
+    meta.append(recrop);
+  }
+  preview.append(meta);
+}
+async function openAttachmentCropper(source, target) {
+  try {
+    await DesktopCropper.open(source, {
+      target,
+      title: target === "answer" ? "裁剪答案图片" : "裁剪题目图片",
+      onConfirm: ({ file, data, source: originalSource }) => {
+        setPending(
+          target,
+          {
+            id: `asset-${makeId()}`,
+            name: file.name,
+            type: file.type || "image/webp",
+            data,
+          },
+          originalSource,
+        );
+        $("#modal").classList.add("show");
+        toast(target === "answer" ? "答案图片已裁剪" : "题目图片已裁剪");
+        requestAnimationFrame(() =>
+          $(
+            target === "answer"
+              ? "#answerAttachmentPreview .recrop-attachment"
+              : "#attachmentPreview .recrop-attachment",
+          )?.focus(),
+        );
+      },
+    });
+  } catch {
+    toast("图片读取失败，请重新选择或换一张图片");
+  }
+}
+async function handleAttachmentSelection(input, target) {
+  let file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (file.size > 25_000_000) {
+    toast("附件不能超过 25MB");
+    return;
+  }
+  try {
+    let data = await fileData(file),
+      source = { name: file.name, type: file.type, data };
+    if (file.type?.startsWith("image/")) {
+      await openAttachmentCropper(source, target);
+      return;
+    }
+    if (target === "answer" || file.type !== "application/pdf") {
+      toast(target === "answer" ? "答案附件请选择图片" : "仅支持图片或 PDF");
+      return;
+    }
+    setPending(target, {
+      id: `asset-${makeId()}`,
+      name: file.name,
+      type: "application/pdf",
+      data,
+    });
+    $("#modal").classList.add("show");
+    toast(`已附加「${file.name}」`);
+  } catch {
+    toast("附件读取失败，请重新选择");
+  }
+}
 $("#questionForm").onsubmit = async (e) => {
   e.preventDefault();
   let f = new FormData(e.target),
     attachment = null,
+    answerAttachment = null,
     path = readKnowledgePath($("#knowledgePathSelects"));
   if (!path.length) {
     toast("请至少选择一个知识大类");
     return;
   }
-  if (pendingAttachment) {
-    try {
+  if (!String(f.get("question") || "").trim() && !pendingAttachment) {
+    e.target.elements.question.focus();
+    toast("请填写题目内容，或添加一张题目图片 / PDF");
+    return;
+  }
+  try {
+    if (pendingAttachment) {
       await putAsset(pendingAttachment);
       attachment = {
         id: pendingAttachment.id,
         name: pendingAttachment.name,
         type: pendingAttachment.type,
       };
-    } catch {
-      toast("附件保存失败，已仅保存文字错题");
     }
+    if (pendingAnswerAttachment) {
+      await putAsset(pendingAnswerAttachment);
+      answerAttachment = {
+        id: pendingAnswerAttachment.id,
+        name: pendingAnswerAttachment.name,
+        type: pendingAnswerAttachment.type,
+      };
+    }
+  } catch {
+    if (attachment?.id) await deleteAsset(attachment.id).catch(() => {});
+    if (answerAttachment?.id)
+      await deleteAsset(answerAttachment.id).catch(() => {});
+    toast("附件保存失败，请重试或先移除附件");
+    return;
   }
   let q = normalizeQuestion({
     id: Date.now(),
@@ -1511,6 +1668,7 @@ $("#questionForm").onsubmit = async (e) => {
     reflection: f.get("reflection"),
     conclusion: f.get("conclusion"),
     attachment,
+    answerAttachment,
     difficulty: 3,
     date: "刚刚",
     revealed: false,
@@ -1518,7 +1676,11 @@ $("#questionForm").onsubmit = async (e) => {
   });
   questions.unshift(q);
   pendingAttachment = null;
-  $("#attachmentPreview").innerHTML = "";
+  pendingAnswerAttachment = null;
+  pendingImageSource = null;
+  pendingAnswerImageSource = null;
+  renderPendingAttachment("question");
+  renderPendingAttachment("answer");
   if (!saveQuestions()) return;
   e.target.reset();
   $("#modal").classList.remove("show");
@@ -1530,24 +1692,19 @@ $("#subjectSelect").onchange = () => updateModuleSelect();
 $("#unitFilter").onchange = render;
 $("#sortFilter").onchange = render;
 $("#importBtn").onclick = () => $("#fileInput").click();
-$("#fileInput").onchange = (e) => {
-  let file = e.target.files[0];
-  if (!file) return;
-  let r = new FileReader();
-  r.onload = () => {
-    pendingAttachment = {
-      id: `asset-${Date.now()}`,
-      name: file.name,
-      type: file.type || "application/pdf",
-      data: r.result,
-    };
-    $("#attachmentPreview").innerHTML = file.type.startsWith("image/")
-      ? `<img src="${r.result}" alt="${esc(file.name)}"><span>${esc(file.name)}</span>`
-      : `<span>PDF 已附加：${esc(file.name)}</span>`;
-    toast(`已附加「${file.name}」`);
-    $("#modal").classList.add("show");
-  };
-  r.readAsDataURL(file);
+$("#selectQuestionAttachment").onclick = () => $("#fileInput").click();
+$("#selectAnswerAttachment").onclick = () => $("#answerFileInput").click();
+$("#fileInput").onchange = (e) =>
+  handleAttachmentSelection(e.target, "question");
+$("#answerFileInput").onchange = (e) =>
+  handleAttachmentSelection(e.target, "answer");
+$("#removeQuestionAttachment").onclick = () => {
+  setPending("question", null);
+  toast("题目附件已移除");
+};
+$("#removeAnswerAttachment").onclick = () => {
+  setPending("answer", null);
+  toast("答案图片已移除");
 };
 $("#exportBtn").onclick = downloadBackup;
 $("#exportBackupBtn").onclick = downloadBackup;

@@ -13,6 +13,7 @@
     <link rel="icon" href="icon.svg" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="styles-extra.css" />
+    <link rel="stylesheet" href="desktop-cropper.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -101,7 +102,7 @@
             <div>
               <div class="section-head">
                 <h2 id="listHeading">全部错题 <span id="listCount">0</span></h2>
-                <button class="ghost-btn" id="importBtn">⇧ 导入 PDF 截图</button
+                <button class="ghost-btn" id="importBtn">导入题目附件</button
                 ><input
                   id="fileInput"
                   type="file"
@@ -401,13 +402,24 @@
             >标签 <span class="label-hint">用逗号分隔，可选</span
             ><input name="tags" placeholder="计算错误, 审题失误" /></label
           ><label
-            >题目内容<textarea
-              required
+            >题目内容 <span class="label-hint">题干文字或附件至少填写一项</span><textarea
               name="question"
               rows="4"
-              placeholder="粘贴题目，或上传 PDF 截图后补充说明"
+              placeholder="粘贴题目，或添加图片 / PDF 后补充说明"
             ></textarea>
           </label>
+          <section class="desktop-media-entry" aria-labelledby="questionAttachmentTitle">
+            <div class="desktop-media-head">
+              <div>
+                <strong id="questionAttachmentTitle">题目图片 / PDF</strong>
+                <span>图片选择后可自由裁剪，PDF 直接附加</span>
+              </div>
+              <div class="desktop-media-actions">
+                <button class="ghost-btn" id="selectQuestionAttachment" type="button">选择文件</button>
+                <button class="ghost-btn attachment-remove hidden" id="removeQuestionAttachment" type="button">移除</button>
+              </div>
+            </div>
+          </section>
           <div id="attachmentPreview" class="attachment-preview"></div>
           <label
             >答案与解析<textarea
@@ -416,6 +428,20 @@
               placeholder="先写出标准答案，再补充关键步骤"
             ></textarea>
           </label>
+          <section class="desktop-media-entry" aria-labelledby="answerAttachmentTitle">
+            <div class="desktop-media-head">
+              <div>
+                <strong id="answerAttachmentTitle">答案图片</strong>
+                <span>可单独选择、裁剪和移除</span>
+              </div>
+              <div class="desktop-media-actions">
+                <button class="ghost-btn" id="selectAnswerAttachment" type="button">选择图片</button>
+                <button class="ghost-btn attachment-remove hidden" id="removeAnswerAttachment" type="button">移除</button>
+              </div>
+            </div>
+            <input id="answerFileInput" type="file" accept="image/*" hidden />
+          </section>
+          <div id="answerAttachmentPreview" class="attachment-preview"></div>
           <div class="form-row">
             <label
               >我的反思<textarea
@@ -516,8 +542,66 @@
         </form>
       </div>
     </div>
+    <div
+      class="image-cropper"
+      id="imageCropper"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cropperTitle"
+      aria-hidden="true"
+    >
+      <section class="cropper-sheet">
+        <header class="cropper-header">
+          <div>
+            <span>图片处理</span>
+            <h2 id="cropperTitle">裁剪题目图片</h2>
+          </div>
+          <button id="cancelCropBtn" class="cropper-text-btn" type="button">取消</button>
+        </header>
+        <div class="cropper-body">
+          <div class="cropper-stage" id="cropperStage">
+            <canvas
+              id="cropCanvas"
+              tabindex="0"
+              aria-label="图片区域：拖动图片调整位置，滚轮或加减键缩放，方向键微调"
+            ></canvas>
+            <div class="crop-selection" id="cropSelection" role="group" aria-label="可调整大小和位置的裁剪框">
+              <span class="crop-grid-line vertical first"></span>
+              <span class="crop-grid-line vertical second"></span>
+              <span class="crop-grid-line horizontal first"></span>
+              <span class="crop-grid-line horizontal second"></span>
+              <button class="crop-handle nw" data-crop-handle="nw" type="button" aria-label="拖动或用方向键调整左上角"></button>
+              <button class="crop-handle ne" data-crop-handle="ne" type="button" aria-label="拖动或用方向键调整右上角"></button>
+              <button class="crop-handle sw" data-crop-handle="sw" type="button" aria-label="拖动或用方向键调整左下角"></button>
+              <button class="crop-handle se" data-crop-handle="se" type="button" aria-label="拖动或用方向键调整右下角"></button>
+              <button id="cropMoveHandle" class="crop-move-handle" type="button" aria-label="拖动或用方向键移动整个裁剪框">移动选框</button>
+            </div>
+          </div>
+          <aside class="cropper-tools">
+            <p class="crop-guide">拖四角改变选框大小，拖中间按钮移动选框；拖图片改变取景，滚轮或双指缩放。</p>
+            <div class="crop-ratios" role="group" aria-label="裁剪比例">
+              <button class="active" data-crop-ratio="free" type="button" aria-pressed="true">自由</button>
+              <button data-crop-ratio="source" type="button" aria-pressed="false">原比例</button>
+              <button data-crop-ratio="1.333333" type="button" aria-pressed="false">题目横图</button>
+              <button data-crop-ratio="1" type="button" aria-pressed="false">方形</button>
+            </div>
+            <label class="crop-zoom" for="cropZoom">
+              <span>缩放</span>
+              <input id="cropZoom" type="range" min="0" max="100" value="0" aria-label="图片缩放" />
+            </label>
+            <p id="cropStatus" class="crop-status" aria-live="polite"></p>
+            <div class="cropper-actions">
+              <button id="resetCropBtn" class="cropper-secondary" type="button">重置</button>
+              <button id="confirmCropBtn" class="cropper-primary" type="button">确认裁剪</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>
     <div class="toast" id="toast"></div>
     <script src="taxonomy-utils.js"></script>
+    <script src="mobile/crop-utils.js"></script>
+    <script src="desktop-cropper.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
