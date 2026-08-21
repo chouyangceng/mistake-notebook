@@ -46,6 +46,16 @@ assert.deepStrictEqual(
   { x: 200, y: 0, width: 120, height: 100 },
 );
 assert.deepStrictEqual(
+  CropUtils.moveCropBox(
+    { x: 40, y: 50, width: 120, height: 100 },
+    -12,
+    12,
+    320,
+    240,
+  ),
+  { x: 28, y: 62, width: 120, height: 100 },
+);
+assert.deepStrictEqual(
   CropUtils.resizeCropBox(
     { x: 50, y: 50, width: 150, height: 120 },
     "se",
@@ -80,6 +90,26 @@ assert.deepStrictEqual(
     { x: 40, y: 50, width: 300, height: 250 },
   ),
   { x: 20, y: -100 },
+);
+assert.deepStrictEqual(
+  CropUtils.clampImageToCropBox(
+    -72,
+    -25,
+    400,
+    300,
+    1,
+    { x: 50, y: 40, width: 200, height: 180 },
+  ),
+  { x: -72, y: -25 },
+);
+assert.deepStrictEqual(
+  CropUtils.zoomAtPoint(
+    { scale: 1, offsetX: -100, offsetY: -50 },
+    1.2,
+    150,
+    120,
+  ),
+  { scale: 1.2, offsetX: -150, offsetY: -84 },
 );
 
 assert.deepStrictEqual(CropUtils.outputSize(4000, 3000), {

@@ -659,6 +659,32 @@ body.cropper-open {
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 58%), 0 0 0 1px rgb(20 36 28 / 70%);
   pointer-events: none;
 }
+.crop-stage-hint {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 18px;
+  display: grid;
+  gap: 2px;
+  max-width: calc(100% - 32px);
+  padding: 9px 14px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 12px;
+  background: rgb(8 15 11 / 78%);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+  backdrop-filter: blur(8px);
+}
+.crop-stage-hint strong {
+  font-size: 14px;
+}
+.crop-stage-hint span {
+  color: #cbd8d1;
+  font-size: 11px;
+  white-space: nowrap;
+}
 .crop-grid-line {
   position: absolute;
   background: rgb(255 255 255 / 42%);
@@ -688,8 +714,7 @@ body.cropper-open {
   top: 66.666%;
   left: 0;
 }
-.crop-handle,
-.crop-move-handle {
+.crop-handle {
   position: absolute;
   z-index: 3;
   min-width: 48px;
@@ -704,8 +729,8 @@ body.cropper-open {
 .crop-handle::after {
   content: "";
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-color: #9fe0bd;
   border-style: solid;
 }
@@ -745,20 +770,6 @@ body.cropper-open {
   left: 6px;
   border-width: 0 4px 4px 0;
 }
-.crop-move-handle {
-  top: 50%;
-  left: 50%;
-  width: auto;
-  min-width: 88px;
-  padding: 8px 12px;
-  border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: 999px;
-  background: rgb(12 24 18 / 76%);
-  color: #f5fff8;
-  font-size: 12px;
-  font-weight: 750;
-  transform: translate(-50%, -50%);
-}
 .crop-guide {
   margin: 0 0 10px;
   color: #cbd8d1;
@@ -770,6 +781,35 @@ body.cropper-open {
   padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
   border-top: 1px solid rgb(255 255 255 / 12%);
   background: #151e19;
+}
+.crop-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #0f1713;
+}
+.crop-mode-switch button {
+  min-height: 46px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #bfcac4;
+  font-weight: 750;
+}
+.crop-mode-switch button.active {
+  border-color: #8bc4a4;
+  background: #dcefe4;
+  color: #173d2d;
+}
+.crop-mode-box #cropCanvas {
+  cursor: move;
+}
+.crop-mode-box .crop-selection {
+  border-color: #9fe0bd;
 }
 .crop-ratios {
   display: grid;
@@ -789,9 +829,45 @@ body.cropper-open {
   background: #dcefe4;
   color: #173d2d;
 }
+.crop-adjust-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.crop-nudge,
+.crop-zoom-buttons {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+.crop-nudge {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.crop-zoom-buttons {
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+}
+.crop-nudge button,
+.crop-zoom-buttons button {
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #435249;
+  border-radius: 10px;
+  background: #202b25;
+  color: #f2f7f4;
+  font-size: 22px;
+  line-height: 1;
+}
+.crop-zoom-buttons span {
+  color: #bfcac4;
+  font-size: 11px;
+  text-align: center;
+}
 .crop-zoom {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   margin: 10px 0 0;
@@ -844,7 +920,9 @@ body.cropper-open {
     width: min(38vw, 300px);
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 12px max(14px, env(safe-area-inset-right))
       max(12px, env(safe-area-inset-bottom)) 14px;
     border-top: 0;
@@ -852,6 +930,12 @@ body.cropper-open {
   }
   .crop-ratios {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .crop-adjust-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .crop-stage-hint {
+    bottom: 10px;
   }
   .crop-status {
     min-height: 14px;

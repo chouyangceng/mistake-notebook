@@ -36,6 +36,7 @@ const cropState = {
   pointers: new Map(),
   gesture: null,
   boxGesture: null,
+  interactionMode: "image",
   returnFocus: null,
 };
 
@@ -425,7 +426,7 @@ function sizeCropViewport(reset = false) {
     cropState.cropBox.height,
   );
   cropState.scale = reset
-    ? cropState.minScale
+    ? Math.min(cropState.minScale * 1.08, cropState.minScale * 6)
     : CropUtils.clamp(
         cropState.minScale * oldZoom,
         cropState.minScale,
@@ -494,6 +495,62 @@ function applyCropBox(nextBox) {
   renderCropCanvas();
 }
 
+function setCropInteractionMode(mode, announce = true) {
+  cropState.interactionMode = mode === "box" ? "box" : "image";
+  const movingBox = cropState.interactionMode === "box";
+  $$('[data-crop-mode]').forEach((button) => {
+    const active = button.dataset.cropMode === cropState.interactionMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  $("#imageCropper").classList.toggle("crop-mode-box", movingBox);
+  $("#cropCanvas").setAttribute(
+    "aria-label",
+    movingBox
+      ? "图片裁剪区域：单指拖动白色选框，双指缩放照片"
+      : "图片裁剪区域：单指拖动照片选择保留部位，双指缩放照片",
+  );
+  $("#cropGuide").textContent = movingBox
+    ? "单指拖动白框调整裁剪位置；拖四角改变范围。"
+    : "单指拖动照片，准确选择要保留的部位；双指可缩放。";
+  $("#cropStageHint").innerHTML = movingBox
+    ? "<strong>拖动白框</strong><span>调整裁剪位置，四角可改变范围</span>"
+    : "<strong>拖动照片</strong><span>让要保留的内容进入白框</span>";
+  if (announce) {
+    $("#cropStatus").textContent = movingBox
+      ? "当前：移动选框"
+      : "当前：移动照片";
+  }
+}
+
+function nudgeCrop(direction, amount = 12) {
+  const deltas = {
+    left: [-amount, 0],
+    right: [amount, 0],
+    up: [0, -amount],
+    down: [0, amount],
+  };
+  const [deltaX, deltaY] = deltas[direction] || [0, 0];
+  if (cropState.interactionMode === "box") {
+    applyCropBox(
+      CropUtils.moveCropBox(
+        cropState.cropBox,
+        deltaX,
+        deltaY,
+        cropState.viewportWidth,
+        cropState.viewportHeight,
+      ),
+    );
+  } else {
+    cropState.offsetX += deltaX;
+    cropState.offsetY += deltaY;
+    clampCropPosition();
+    renderCropCanvas();
+  }
+  $("#cropStatus").textContent =
+    cropState.interactionMode === "box" ? "已微调选框位置" : "已微调照片位置";
+}
+
 async function openImageCropper(source, target = "question") {
   try {
     const image = await loadImage(source.data);
@@ -501,6 +558,7 @@ async function openImageCropper(source, target = "question") {
     cropState.source = { ...source };
     cropState.target = target;
     cropState.ratioMode = "free";
+    cropState.interactionMode = "image";
     cropState.pointers.clear();
     cropState.gesture = null;
     cropState.boxGesture = null;
@@ -510,12 +568,13 @@ async function openImageCropper(source, target = "question") {
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     });
-    $("#cropStatus").textContent = "";
+    $("#cropStatus").textContent = "拍照完成，请拖动照片选择要保留的部位";
     $("#cropperTitle").textContent =
       target === "answer" ? "裁剪答案图片" : "裁剪题目图片";
     $("#imageCropper").classList.add("show");
     $("#imageCropper").setAttribute("aria-hidden", "false");
     document.body.classList.add("cropper-open");
+    setCropInteractionMode("image", false);
     requestAnimationFrame(() => {
       sizeCropViewport(true);
       $("#cancelCropBtn").focus();
@@ -1693,6 +1752,24 @@ $("#backupFile").onchange = (event) => {
 };
 $("#cancelCropBtn").onclick = () => closeImageCropper();
 $("#resetCropBtn").onclick = () => sizeCropViewport(true);
+$$('[data-crop-mode]').forEach((button) => {
+  button.onclick = () => setCropInteractionMode(button.dataset.cropMode);
+});
+$$('[data-crop-nudge]').forEach((button) => {
+  button.onclick = () => nudgeCrop(button.dataset.cropNudge);
+});
+$$('[data-crop-zoom-step]').forEach((button) => {
+  button.onclick = () => {
+    const factor = button.dataset.cropZoomStep === "in" ? 1.12 : 0.89;
+    applyCropScale(
+      cropState.scale * factor,
+      cropState.cropBox.x + cropState.cropBox.width / 2,
+      cropState.cropBox.y + cropState.cropBox.height / 2,
+    );
+    $("#cropStatus").textContent =
+      button.dataset.cropZoomStep === "in" ? "照片已放大" : "照片已缩小";
+  };
+});
 $$("[data-crop-ratio]").forEach((button) => {
   button.onclick = () => {
     cropState.ratioMode = button.dataset.cropRatio;
@@ -1804,10 +1881,9 @@ function bindCropBoxDrag(element, mode, handle = "") {
 $$("[data-crop-handle]").forEach((handle) =>
   bindCropBoxDrag(handle, "resize", handle.dataset.cropHandle),
 );
-bindCropBoxDrag($("#cropMoveHandle"), "move");
-
 const cropCanvas = $("#cropCanvas");
 cropCanvas.onpointerdown = (event) => {
+  event.preventDefault();
   const point = cropPointerPoint(event);
   cropCanvas.setPointerCapture(event.pointerId);
   cropState.pointers.set(event.pointerId, point);
@@ -1816,11 +1892,28 @@ cropCanvas.onpointerdown = (event) => {
 cropCanvas.onpointermove = (event) => {
   const previous = cropState.pointers.get(event.pointerId);
   if (!previous) return;
+  event.preventDefault();
   const point = cropPointerPoint(event);
   cropState.pointers.set(event.pointerId, point);
   if (cropState.pointers.size === 1) {
-    cropState.offsetX += point.x - previous.x;
-    cropState.offsetY += point.y - previous.y;
+    const deltaX = point.x - previous.x;
+    const deltaY = point.y - previous.y;
+    if (cropState.interactionMode === "box") {
+      applyCropBox(
+        CropUtils.moveCropBox(
+          cropState.cropBox,
+          deltaX,
+          deltaY,
+          cropState.viewportWidth,
+          cropState.viewportHeight,
+        ),
+      );
+      $("#cropStatus").textContent = "正在移动选框";
+      return;
+    }
+    cropState.offsetX += deltaX;
+    cropState.offsetY += deltaY;
+    $("#cropStatus").textContent = "正在移动照片";
   } else {
     if (!cropState.gesture) startCropGesture();
     const [first, second] = [...cropState.pointers.values()];
@@ -1870,12 +1963,13 @@ cropCanvas.onkeydown = (event) => {
   const movement = event.shiftKey ? 30 : 10;
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
     event.preventDefault();
-    if (event.key === "ArrowLeft") cropState.offsetX -= movement;
-    if (event.key === "ArrowRight") cropState.offsetX += movement;
-    if (event.key === "ArrowUp") cropState.offsetY -= movement;
-    if (event.key === "ArrowDown") cropState.offsetY += movement;
-    clampCropPosition();
-    renderCropCanvas();
+    const direction = {
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      ArrowUp: "up",
+      ArrowDown: "down",
+    }[event.key];
+    nudgeCrop(direction, movement);
   }
   if (["+", "=", "-", "_"].includes(event.key)) {
     event.preventDefault();

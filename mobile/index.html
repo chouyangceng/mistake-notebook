@@ -383,8 +383,12 @@
             <canvas
               id="cropCanvas"
               tabindex="0"
-              aria-label="图片区域：单指拖动图片，双指向外移动放大图片"
+              aria-label="图片裁剪区域：默认单指拖动照片选择保留部位，双指缩放照片"
             ></canvas>
+            <div class="crop-stage-hint" id="cropStageHint" aria-hidden="true">
+              <strong>拖动照片</strong>
+              <span>让要保留的内容进入白框</span>
+            </div>
             <div class="crop-selection" id="cropSelection" role="group" aria-label="可调整大小和位置的裁剪框">
               <span class="crop-grid-line vertical first"></span>
               <span class="crop-grid-line vertical second"></span>
@@ -394,11 +398,18 @@
               <button class="crop-handle ne" data-crop-handle="ne" type="button" aria-label="拖动右上角调整裁剪框"></button>
               <button class="crop-handle sw" data-crop-handle="sw" type="button" aria-label="拖动左下角调整裁剪框"></button>
               <button class="crop-handle se" data-crop-handle="se" type="button" aria-label="拖动右下角调整裁剪框"></button>
-              <button id="cropMoveHandle" class="crop-move-handle" type="button" aria-label="拖动整个裁剪框">移动选框</button>
             </div>
           </div>
           <div class="cropper-tools">
-            <p class="crop-guide">拖四角改变选框大小；拖“移动选框”调整位置；在图片上双指外扩放大。</p>
+            <p class="crop-guide" id="cropGuide">单指拖动照片，准确选择要保留的部位；双指可缩放。</p>
+            <div class="crop-mode-switch" role="group" aria-label="拖动操作模式">
+              <button class="active" data-crop-mode="image" type="button" aria-pressed="true">
+                移动照片
+              </button>
+              <button data-crop-mode="box" type="button" aria-pressed="false">
+                移动选框
+              </button>
+            </div>
             <div class="crop-ratios" role="group" aria-label="裁剪比例">
               <button
                 class="active"
@@ -426,16 +437,22 @@
                 方形
               </button>
             </div>
+            <div class="crop-adjust-row">
+              <div class="crop-nudge" role="group" aria-label="微调位置">
+                <button data-crop-nudge="left" type="button" aria-label="向左移动">←</button>
+                <button data-crop-nudge="up" type="button" aria-label="向上移动">↑</button>
+                <button data-crop-nudge="down" type="button" aria-label="向下移动">↓</button>
+                <button data-crop-nudge="right" type="button" aria-label="向右移动">→</button>
+              </div>
+              <div class="crop-zoom-buttons" role="group" aria-label="缩放照片">
+                <button data-crop-zoom-step="out" type="button" aria-label="缩小照片">−</button>
+                <span>缩放</span>
+                <button data-crop-zoom-step="in" type="button" aria-label="放大照片">＋</button>
+              </div>
+            </div>
             <label class="crop-zoom" for="cropZoom">
-              <span>缩放</span>
-              <input
-                id="cropZoom"
-                type="range"
-                min="0"
-                max="100"
-                value="0"
-                step="1"
-              />
+              <span>精细缩放</span>
+              <input id="cropZoom" type="range" min="0" max="100" value="0" step="1" />
             </label>
             <p id="cropStatus" class="crop-status" aria-live="polite"></p>
             <div class="cropper-actions">
