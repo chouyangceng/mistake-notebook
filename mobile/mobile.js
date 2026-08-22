@@ -216,9 +216,49 @@ function renderTitleBooks(selectedCode = "") {
   $("#mobileBookList").innerHTML = titleBooks
     .map(
       (book) =>
-        `<div class="book-list-item"><span><strong>${esc(book.code)}</strong>${book.name ? ` · ${esc(book.name)}` : " · 未命名书籍"}</span><button type="button" data-delete-title-book="${esc(book.code)}" aria-label="删除书籍 ${esc(book.code)}">删除</button></div>`,
+        `<article class="book-list-item" data-book-row="${esc(book.code)}"><div class="book-list-summary"><span><strong>${esc(book.code)}</strong>${book.name ? ` · ${esc(book.name)}` : " · 未命名书籍"}</span><div class="book-row-actions"><button class="secondary" type="button" data-edit-title-book="${esc(book.code)}">编辑</button><button class="book-delete-button" type="button" data-delete-title-book="${esc(book.code)}" aria-label="删除书籍 ${esc(book.code)}">删除</button></div></div><div class="book-inline-editor hidden"><label>书籍代号<input data-edit-book-code maxlength="24" autocapitalize="none" autocomplete="off" value="${esc(book.code)}"></label><label>书名（可选）<input data-edit-book-name maxlength="40" autocomplete="off" value="${esc(book.name)}"></label><div class="book-edit-actions"><button class="secondary" type="button" data-cancel-book-edit>取消</button><button class="primary compact" type="button" data-save-book-edit="${esc(book.code)}">保存修改</button></div></div></article>`,
     )
     .join("");
+  $$('[data-edit-title-book]').forEach((button) => {
+    button.onclick = () => {
+      $$(".book-inline-editor").forEach((editor) =>
+        editor.classList.add("hidden"),
+      );
+      const editor = button.closest(".book-list-item").querySelector(
+        ".book-inline-editor",
+      );
+      editor.classList.remove("hidden");
+      editor.querySelector("[data-edit-book-code]").focus();
+    };
+  });
+  $$('[data-cancel-book-edit]').forEach((button) => {
+    button.onclick = () =>
+      button.closest(".book-inline-editor").classList.add("hidden");
+  });
+  $$('[data-save-book-edit]').forEach((button) => {
+    button.onclick = () => {
+      const editor = button.closest(".book-inline-editor");
+      try {
+        titleBooks = ShitiTitleCode.updateBook(
+          titleBooks,
+          button.dataset.saveBookEdit,
+          {
+            code: editor.querySelector("[data-edit-book-code]").value,
+            name: editor.querySelector("[data-edit-book-name]").value,
+          },
+        );
+        const updatedCode = ShitiTitleCode.cleanBookCode(
+          editor.querySelector("[data-edit-book-code]").value,
+        );
+        saveTitleBooks();
+        renderTitleBooks(updatedCode);
+        updateTitlePreview();
+        message("书籍信息已更新，已有错题标题保持不变", true);
+      } catch (error) {
+        message(error.message);
+      }
+    };
+  });
   $$('[data-delete-title-book]').forEach((button) => {
     button.onclick = () => {
       if (titleBooks.length <= 1) return message("至少保留一本书");
@@ -269,9 +309,10 @@ function resetTitleBuilder(title = "") {
 }
 
 function message(text, ok = false) {
-  const el = $("#message");
-  el.textContent = text;
-  el.className = `message ${ok ? "ok" : "error"}`;
+  for (const el of $$("#message, #manageMessage, #syncMessage")) {
+    el.textContent = text;
+    el.className = `message ${ok ? "ok" : "error"}`;
+  }
 }
 
 function askText(title, hint) {
@@ -1136,9 +1177,6 @@ async function editQuestion(id, focusClassification = false) {
   form.elements.title.value = item.title || "";
   resetTitleBuilder(item.title || "");
   form.elements.question.value = item.question || "";
-  form.elements.topic.value = Array.isArray(item.topic)
-    ? item.topic.join(", ")
-    : item.topic || "";
   form.elements.answer.value = item.answer || "";
   selectedFile = null;
   selectedFileData = item.file?.data || "";
@@ -1861,12 +1899,6 @@ $("#questionGalleryBtn").onclick = () => $("#file").click();
 $("#answerCameraBtn").onclick = () => $("#answerCameraFile").click();
 $("#answerGalleryBtn").onclick = () => $("#answerFile").click();
 $("#cancelEditBtn").onclick = resetForm;
-$("#mobileManageBooksBtn").onclick = () => {
-  const manager = $("#mobileBookManager");
-  const open = manager.classList.toggle("hidden") === false;
-  $("#mobileManageBooksBtn").setAttribute("aria-expanded", String(open));
-  if (open) $("#mobileNewBookCode").focus();
-};
 $("#mobileAddBookBtn").onclick = () => {
   try {
     titleBooks = ShitiTitleCode.addBook(titleBooks, {
@@ -2307,10 +2339,11 @@ $("#questionForm").onsubmit = async (event) => {
       knowledgePath,
       module: knowledgePath[0],
       unit: knowledgePath[1] || "",
-      topic: String(payload.topic || "")
-        .split(/[,，]/)
-        .map((item) => item.trim())
-        .filter(Boolean),
+      topic: Array.isArray(old?.topic)
+        ? old.topic
+        : old?.topic
+          ? [String(old.topic)]
+          : [],
       file,
       answerFile,
       remoteAttachment: removeExistingFile

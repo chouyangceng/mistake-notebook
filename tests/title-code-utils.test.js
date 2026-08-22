@@ -5,6 +5,7 @@ const {
   buildQuestionTitle,
   normalizeBooks,
   parseQuestionTitle,
+  updateBook,
 } = require("../mobile/title-code-utils");
 
 assert.equal(
@@ -55,5 +56,17 @@ assert.deepEqual(parseQuestionTitle("1000a-0-12(xxxx-xx-xx)"), {
   note: "xxxx-xx-xx",
 });
 assert.equal(parseQuestionTitle("普通自定义标题"), null);
+const updatedBooks = updateBook(books, "book_1", {
+  code: "BOOK_2",
+  name: "线性代数讲义",
+});
+assert.deepEqual(updatedBooks.at(-1), {
+  code: "book_2",
+  name: "线性代数讲义",
+});
+assert.throws(
+  () => updateBook(updatedBooks, "book_2", { code: "1000a" }),
+  /已经存在/,
+);
 
 console.log("title-code-utils tests passed");

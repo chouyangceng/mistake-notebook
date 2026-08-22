@@ -41,8 +41,11 @@
         <button class="nav-button" type="button" data-view="paperView">
           组卷
         </button>
+        <button class="nav-button" type="button" data-view="manageView">
+          设置
+        </button>
         <button class="nav-button" type="button" data-view="settingsView">
-          分类与同步
+          同步
         </button>
       </nav>
 
@@ -88,11 +91,8 @@
             <div class="title-builder-head">
               <div>
                 <strong id="mobileTitleBuilderTitle">快捷标题</strong>
-                <span>按“书籍-章节-题号(补充)”生成</span>
+                <span>书籍与题类请在独立“设置”模块维护</span>
               </div>
-              <button id="mobileManageBooksBtn" class="secondary title-book-manage" type="button" aria-expanded="false">
-                管理书籍
-              </button>
             </div>
             <div class="title-builder-grid">
               <label>书籍<select id="mobileTitleBook"></select></label>
@@ -106,14 +106,6 @@
                 <output id="mobileTitlePreview" aria-live="polite">请填写章节号和题号</output>
               </div>
               <button id="mobileUseTitleBtn" class="primary compact" type="button" disabled>使用此标题</button>
-            </div>
-            <div id="mobileBookManager" class="book-manager hidden">
-              <div class="book-manager-fields">
-                <label>书籍代号<input id="mobileNewBookCode" maxlength="24" autocapitalize="none" autocomplete="off" placeholder="例如 1000g" /></label>
-                <label>书名（可选）<input id="mobileNewBookName" maxlength="40" autocomplete="off" placeholder="例如 高数辅导讲义" /></label>
-              </div>
-              <button id="mobileAddBookBtn" class="secondary" type="button">添加书籍</button>
-              <div id="mobileBookList" class="book-list" aria-label="已保存的书籍"></div>
             </div>
           </section>
           <label
@@ -170,11 +162,6 @@
               移除题目附件
             </button>
           </section>
-          <label
-            >具体知识点
-            <span class="required-hint">与知识分类、题型独立，用逗号分隔</span
-            ><input name="topic" placeholder="特征值, 相似矩阵"
-          /></label>
           <label
             >答案 / 解析<textarea
               name="answer"
@@ -296,20 +283,41 @@
         </section>
       </section>
 
-      <section id="settingsView" class="app-view">
-        <section class="card config-card">
+      <section id="manageView" class="app-view">
+        <section class="card book-settings-card" aria-labelledby="bookSettingsTitle">
           <div class="queue-head">
             <div>
               <span class="step">04</span>
-              <h2>分类设置</h2>
-              <p>知识分类按文件夹逻辑管理，可添加下级、重命名、移动和删除；旧错题会跟随分类变化。</p>
+              <h2 id="bookSettingsTitle">书籍设置</h2>
+              <p>集中维护快捷标题使用的书籍代号和书名；修改配置不会改变已有错题标题。</p>
+            </div>
+          </div>
+          <div id="mobileBookManager" class="book-manager standalone-book-manager">
+            <div class="book-manager-fields">
+              <label>书籍代号<input id="mobileNewBookCode" maxlength="24" autocapitalize="none" autocomplete="off" placeholder="例如 1000g" /></label>
+              <label>书名（可选）<input id="mobileNewBookName" maxlength="40" autocomplete="off" placeholder="例如 高数辅导讲义" /></label>
+            </div>
+            <button id="mobileAddBookBtn" class="secondary" type="button">添加书籍</button>
+            <div id="mobileBookList" class="book-list" aria-label="已保存的书籍"></div>
+          </div>
+        </section>
+        <section class="card config-card">
+          <div class="queue-head">
+            <div>
+              <h2>题类设置</h2>
+              <p>集中维护知识分类和题型；知识分类仍按文件夹逻辑添加下级、重命名、移动和删除。</p>
             </div>
           </div>
           <div id="mobileConfigCards" class="config-list"></div>
         </section>
+        <div id="manageMessage" class="message" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="settingsView" class="app-view">
         <section class="card" id="connectCard">
           <div class="queue-head">
             <div>
+              <span class="step">05</span>
               <h2>可选电脑同步</h2>
               <p>不填写也不影响本机使用；同步失败不会丢题。</p>
             </div>
@@ -371,6 +379,7 @@
             />
           </div>
         </section>
+        <div id="syncMessage" class="message" role="status" aria-live="polite"></div>
       </section>
     </main>
     <div class="mobile-prompt-backdrop" id="mobileTextPrompt">

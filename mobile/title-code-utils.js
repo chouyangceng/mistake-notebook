@@ -84,6 +84,22 @@
     return [...list, book];
   }
 
+  function updateBook(books, currentCode, candidate) {
+    const list = normalizeBooks(books);
+    const current = cleanBookCode(currentCode);
+    const index = list.findIndex((item) => item.code === current);
+    if (index < 0) throw new Error("要编辑的书籍不存在");
+    const code = cleanBookCode(candidate?.code);
+    const name = cleanBookName(candidate?.name);
+    if (!code) throw new Error("请填写书籍代号");
+    if (!/^[a-z0-9._]+$/.test(code))
+      throw new Error("书籍代号只能使用字母、数字、点或下划线");
+    if (list.some((item, itemIndex) => itemIndex !== index && item.code === code))
+      throw new Error("这个书籍代号已经存在");
+    list[index] = { code, name };
+    return list;
+  }
+
   return {
     DEFAULT_BOOKS,
     cleanBookCode,
@@ -92,5 +108,6 @@
     buildQuestionTitle,
     parseQuestionTitle,
     addBook,
+    updateBook,
   };
 });

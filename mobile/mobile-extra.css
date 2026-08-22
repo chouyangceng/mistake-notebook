@@ -113,7 +113,7 @@
   top: 8px;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   margin: 0 0 16px;
   padding: 6px;
@@ -130,7 +130,7 @@
   border-radius: 11px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .nav-button.active {
@@ -1026,7 +1026,6 @@ body.cropper-open {
   color: var(--muted);
   font-size: 12px;
 }
-.title-book-manage { flex: 0 0 auto; padding-inline: 13px; }
 .title-builder-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1069,35 +1068,62 @@ body.cropper-open {
 .book-manager > button { width: 100%; margin-top: 10px; }
 .book-list { display: grid; gap: 7px; margin-top: 11px; }
 .book-list-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
   min-width: 0;
   padding: 8px 9px 8px 11px;
   border: 1px solid #dce4df;
   border-radius: 11px;
   background: #fff;
 }
-.book-list-item span {
+.book-list-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.book-list-summary span {
   min-width: 0;
+  flex: 1;
   overflow-wrap: anywhere;
   font-size: 13px;
+}
+.book-row-actions,
+.book-edit-actions {
+  display: flex;
+  gap: 8px;
 }
 .book-list-item button {
   flex: 0 0 auto;
   min-height: 48px;
   padding: 7px 11px;
+}
+.book-delete-button {
   background: #f7e4e1;
   color: var(--danger);
   font-size: 12px;
 }
+.book-inline-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #dce4df;
+}
+.book-inline-editor label { margin: 0; }
+.book-edit-actions {
+  grid-column: 1 / -1;
+}
+.book-edit-actions button { flex: 1; margin: 0; }
+.standalone-book-manager { margin-top: 16px; }
 @media (max-width: 420px) {
   .title-builder-head,
   .title-preview-row { align-items: stretch; flex-direction: column; }
-  .title-book-manage,
   .title-preview-row .primary { width: 100%; }
   .title-builder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .title-builder-grid label:first-child,
   .title-note-field { grid-column: 1 / -1; }
+  .book-list-summary { align-items: stretch; flex-direction: column; }
+  .book-row-actions button { flex: 1; }
+  .book-inline-editor { grid-template-columns: 1fr; }
+  .book-edit-actions { grid-column: auto; }
 }
