@@ -37,6 +37,7 @@ const cropState = {
   gesture: null,
   boxGesture: null,
   interactionMode: "image",
+  rotation: 0,
   returnFocus: null,
 };
 
@@ -311,20 +312,47 @@ function loadImage(data) {
   });
 }
 
+function cropImageSize() {
+  return CropUtils.rotatedSize(
+    cropState.image.naturalWidth,
+    cropState.image.naturalHeight,
+    cropState.rotation,
+  );
+}
+
+function drawRotatedCropImage(context) {
+  const sourceWidth = cropState.image.naturalWidth;
+  const sourceHeight = cropState.image.naturalHeight;
+  const turns = CropUtils.normalizeQuarterTurns(cropState.rotation);
+  if (turns === 1) {
+    context.translate(sourceHeight, 0);
+    context.rotate(Math.PI / 2);
+  } else if (turns === 2) {
+    context.translate(sourceWidth, sourceHeight);
+    context.rotate(Math.PI);
+  } else if (turns === 3) {
+    context.translate(0, sourceWidth);
+    context.rotate(-Math.PI / 2);
+  }
+  context.drawImage(cropState.image, 0, 0, sourceWidth, sourceHeight);
+}
+
 function cropRatio() {
   if (cropState.ratioMode === "free") return null;
   if (cropState.ratioMode === "source") {
-    return cropState.image.naturalWidth / cropState.image.naturalHeight;
+    const imageSize = cropImageSize();
+    return imageSize.width / imageSize.height;
   }
   return Number(cropState.ratioMode) || 1;
 }
 
 function clampCropPosition() {
+  const imageSize = cropImageSize();
   const position = CropUtils.clampImageToCropBox(
     cropState.offsetX,
     cropState.offsetY,
-    cropState.image.naturalWidth,
-    cropState.image.naturalHeight,
+    imageSize.width,
+    imageSize.height,
     cropState.scale,
     cropState.cropBox,
   );
@@ -354,13 +382,11 @@ function renderCropCanvas() {
   context.clearRect(0, 0, cropState.viewportWidth, cropState.viewportHeight);
   context.fillStyle = "#171d19";
   context.fillRect(0, 0, cropState.viewportWidth, cropState.viewportHeight);
-  context.drawImage(
-    cropState.image,
-    cropState.offsetX,
-    cropState.offsetY,
-    cropState.image.naturalWidth * cropState.scale,
-    cropState.image.naturalHeight * cropState.scale,
-  );
+  context.save();
+  context.translate(cropState.offsetX, cropState.offsetY);
+  context.scale(cropState.scale, cropState.scale);
+  drawRotatedCropImage(context);
+  context.restore();
   const selection = $("#cropSelection");
   selection.style.left = `${cropState.cropBox.x}px`;
   selection.style.top = `${cropState.cropBox.y}px`;
@@ -375,12 +401,13 @@ function sizeCropViewport(reset = false) {
   const oldHeight = cropState.viewportHeight;
   const oldScale = cropState.scale;
   const oldBox = { ...cropState.cropBox };
+  const imageSize = cropImageSize();
   const oldCenterX = oldWidth
     ? (oldBox.x + oldBox.width / 2 - cropState.offsetX) / oldScale
-    : cropState.image.naturalWidth / 2;
+    : imageSize.width / 2;
   const oldCenterY = oldHeight
     ? (oldBox.y + oldBox.height / 2 - cropState.offsetY) / oldScale
-    : cropState.image.naturalHeight / 2;
+    : imageSize.height / 2;
   const oldZoom = cropState.minScale ? oldScale / cropState.minScale : 1;
   cropState.viewportWidth = Math.max(1, stage.width);
   cropState.viewportHeight = Math.max(1, stage.height);
@@ -420,8 +447,8 @@ function sizeCropViewport(reset = false) {
     );
   }
   cropState.minScale = CropUtils.minimumScale(
-    cropState.image.naturalWidth,
-    cropState.image.naturalHeight,
+    imageSize.width,
+    imageSize.height,
     cropState.cropBox.width,
     cropState.cropBox.height,
   );
@@ -432,8 +459,8 @@ function sizeCropViewport(reset = false) {
         cropState.minScale,
         cropState.minScale * 6,
       );
-  const centerX = reset ? cropState.image.naturalWidth / 2 : oldCenterX;
-  const centerY = reset ? cropState.image.naturalHeight / 2 : oldCenterY;
+  const centerX = reset ? imageSize.width / 2 : oldCenterX;
+  const centerY = reset ? imageSize.height / 2 : oldCenterY;
   cropState.offsetX =
     cropState.cropBox.x +
     cropState.cropBox.width / 2 -
@@ -468,6 +495,7 @@ function applyCropScale(scale, pointX, pointY) {
 }
 
 function applyCropBox(nextBox) {
+  const imageSize = cropImageSize();
   cropState.cropBox = CropUtils.clampCropBox(
     nextBox,
     cropState.viewportWidth,
@@ -475,8 +503,8 @@ function applyCropBox(nextBox) {
     72,
   );
   const nextMinimum = CropUtils.minimumScale(
-    cropState.image.naturalWidth,
-    cropState.image.naturalHeight,
+    imageSize.width,
+    imageSize.height,
     cropState.cropBox.width,
     cropState.cropBox.height,
   );
@@ -493,6 +521,18 @@ function applyCropBox(nextBox) {
   clampCropPosition();
   syncCropZoom();
   renderCropCanvas();
+}
+
+function rotateCropImage(delta) {
+  cropState.rotation = CropUtils.normalizeQuarterTurns(
+    cropState.rotation + delta,
+  );
+  cropState.pointers.clear();
+  cropState.gesture = null;
+  cropState.boxGesture = null;
+  sizeCropViewport(true);
+  const direction = delta < 0 ? "左" : "右";
+  $("#cropStatus").textContent = `已向${direction}旋转 90°，裁剪范围已重新适配`;
 }
 
 function setCropInteractionMode(mode, announce = true) {
@@ -559,6 +599,7 @@ async function openImageCropper(source, target = "question") {
     cropState.target = target;
     cropState.ratioMode = "free";
     cropState.interactionMode = "image";
+    cropState.rotation = 0;
     cropState.pointers.clear();
     cropState.gesture = null;
     cropState.boxGesture = null;
@@ -609,23 +650,24 @@ function canvasBlob(canvas, type, quality) {
 }
 
 async function createCroppedFile() {
+  const imageSize = cropImageSize();
   const sourceX = CropUtils.clamp(
     (cropState.cropBox.x - cropState.offsetX) / cropState.scale,
     0,
-    cropState.image.naturalWidth,
+    imageSize.width,
   );
   const sourceY = CropUtils.clamp(
     (cropState.cropBox.y - cropState.offsetY) / cropState.scale,
     0,
-    cropState.image.naturalHeight,
+    imageSize.height,
   );
   const sourceWidth = Math.min(
     cropState.cropBox.width / cropState.scale,
-    cropState.image.naturalWidth - sourceX,
+    imageSize.width - sourceX,
   );
   const sourceHeight = Math.min(
     cropState.cropBox.height / cropState.scale,
-    cropState.image.naturalHeight - sourceY,
+    imageSize.height - sourceY,
   );
   const outputSize = CropUtils.outputSize(sourceWidth, sourceHeight);
   const output = document.createElement("canvas");
@@ -634,17 +676,11 @@ async function createCroppedFile() {
   const context = output.getContext("2d");
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
-  context.drawImage(
-    cropState.image,
-    sourceX,
-    sourceY,
-    sourceWidth,
-    sourceHeight,
-    0,
-    0,
-    output.width,
-    output.height,
-  );
+  context.save();
+  context.scale(output.width / sourceWidth, output.height / sourceHeight);
+  context.translate(-sourceX, -sourceY);
+  drawRotatedCropImage(context);
+  context.restore();
   let blob = await canvasBlob(output, "image/webp", 0.86);
   if (!blob || blob.type !== "image/webp") {
     const jpeg = document.createElement("canvas");
@@ -1754,6 +1790,10 @@ $("#cancelCropBtn").onclick = () => closeImageCropper();
 $("#resetCropBtn").onclick = () => sizeCropViewport(true);
 $$('[data-crop-mode]').forEach((button) => {
   button.onclick = () => setCropInteractionMode(button.dataset.cropMode);
+});
+$$('[data-crop-rotate]').forEach((button) => {
+  button.onclick = () =>
+    rotateCropImage(button.dataset.cropRotate === "left" ? -1 : 1);
 });
 $$('[data-crop-nudge]').forEach((button) => {
   button.onclick = () => nudgeCrop(button.dataset.cropNudge);

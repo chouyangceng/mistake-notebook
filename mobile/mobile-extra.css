@@ -829,6 +829,47 @@ body.cropper-open {
   background: #dcefe4;
   color: #173d2d;
 }
+.crop-rotate {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.crop-rotate button {
+  min-width: 0;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #526159;
+  border-radius: 10px;
+  background: #202b25;
+  color: #eef5f1;
+  font-size: 13px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.crop-rotate button:active {
+  border-color: #8bc4a4;
+  background: #2b3931;
+}
+.crop-rotate button:focus-visible {
+  outline: 3px solid #77b895;
+  outline-offset: 2px;
+}
+.crop-rotate svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .crop-adjust-row {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);

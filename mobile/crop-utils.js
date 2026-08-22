@@ -5,6 +5,18 @@
 })(typeof window !== "undefined" ? window : globalThis, () => {
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
+  function normalizeQuarterTurns(turns) {
+    return ((Math.trunc(Number(turns) || 0) % 4) + 4) % 4;
+  }
+
+  function rotatedSize(width, height, turns) {
+    const safeWidth = Math.max(1, Number(width) || 1);
+    const safeHeight = Math.max(1, Number(height) || 1);
+    return normalizeQuarterTurns(turns) % 2
+      ? { width: safeHeight, height: safeWidth }
+      : { width: safeWidth, height: safeHeight };
+  }
+
   function fitViewport(width, height, aspectRatio) {
     const safeWidth = Math.max(1, Number(width) || 1);
     const safeHeight = Math.max(1, Number(height) || 1);
@@ -167,6 +179,8 @@
 
   return {
     clamp,
+    normalizeQuarterTurns,
+    rotatedSize,
     fitViewport,
     minimumScale,
     clampPosition,

@@ -1,6 +1,21 @@
 const assert = require("assert");
 const CropUtils = require("../mobile/crop-utils");
 
+assert.strictEqual(CropUtils.normalizeQuarterTurns(-1), 3);
+assert.strictEqual(CropUtils.normalizeQuarterTurns(5), 1);
+assert.deepStrictEqual(CropUtils.rotatedSize(1200, 800, 0), {
+  width: 1200,
+  height: 800,
+});
+assert.deepStrictEqual(CropUtils.rotatedSize(1200, 800, 1), {
+  width: 800,
+  height: 1200,
+});
+assert.deepStrictEqual(CropUtils.rotatedSize(1200, 800, 3), {
+  width: 800,
+  height: 1200,
+});
+
 assert.deepStrictEqual(CropUtils.fitViewport(400, 300, 1), {
   width: 300,
   height: 300,
