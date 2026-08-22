@@ -49,6 +49,7 @@ const defaultSubjectConfig = subjectDefaults();
 let subjectConfig = normalizeConfig(
   read("shiti-subject-config", defaultSubjectConfig),
 );
+let titleBooks = ShitiTitleCode.normalizeBooks(read("shiti-title-books", null));
 let questions = read("shiti-questions", seed),
   currentSubject = "全部",
   pendingAttachment = null,
@@ -197,6 +198,75 @@ function splitCSV(v) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function saveTitleBooks() {
+  titleBooks = ShitiTitleCode.normalizeBooks(titleBooks);
+  save("shiti-title-books", titleBooks);
+}
+
+function desktopBookLabel(book) {
+  return book.name ? `${book.code} · ${book.name}` : `${book.code} · 未命名书籍`;
+}
+
+function renderDesktopTitleBooks(selectedCode = "") {
+  const select = $("#desktopTitleBook");
+  const selected = selectedCode || select.value || titleBooks[0]?.code || "";
+  select.innerHTML = titleBooks
+    .map(
+      (book) =>
+        `<option value="${esc(book.code)}"${book.code === selected ? " selected" : ""}>${esc(desktopBookLabel(book))}</option>`,
+    )
+    .join("");
+  if (!select.value && titleBooks[0]) select.value = titleBooks[0].code;
+  $("#desktopBookList").innerHTML = titleBooks
+    .map(
+      (book) =>
+        `<div class="book-list-item"><span><strong>${esc(book.code)}</strong>${book.name ? ` · ${esc(book.name)}` : " · 未命名书籍"}</span><button type="button" data-delete-desktop-book="${esc(book.code)}" aria-label="删除书籍 ${esc(book.code)}">删除</button></div>`,
+    )
+    .join("");
+  $$('[data-delete-desktop-book]').forEach((button) => {
+    button.onclick = () => {
+      if (titleBooks.length <= 1) return toast("至少保留一本书");
+      const code = button.dataset.deleteDesktopBook;
+      if (!confirm(`删除书籍「${code}」？已保存错题的标题不会改变。`)) return;
+      titleBooks = titleBooks.filter((book) => book.code !== code);
+      saveTitleBooks();
+      renderDesktopTitleBooks();
+      updateDesktopTitlePreview();
+      toast("书籍已删除，已有错题标题保持不变");
+    };
+  });
+}
+
+function updateDesktopTitlePreview() {
+  const preview = $("#desktopTitlePreview");
+  const button = $("#desktopUseTitleBtn");
+  try {
+    const value = ShitiTitleCode.buildQuestionTitle({
+      bookCode: $("#desktopTitleBook").value,
+      chapter: $("#desktopTitleChapter").value,
+      question: $("#desktopTitleQuestion").value,
+      note: $("#desktopTitleNote").value,
+    });
+    preview.textContent = value;
+    preview.classList.remove("invalid");
+    button.disabled = false;
+    button.dataset.title = value;
+  } catch (error) {
+    preview.textContent = error.message;
+    preview.classList.add("invalid");
+    button.disabled = true;
+    button.dataset.title = "";
+  }
+}
+
+function resetDesktopTitleBuilder() {
+  renderDesktopTitleBooks();
+  $("#desktopTitleChapter").value = "";
+  $("#desktopTitleQuestion").value = "";
+  $("#desktopTitleNote").value = "";
+  updateDesktopTitlePreview();
 }
 function fillSubjectSelect(sel, value) {
   if (!sel) return;
@@ -645,6 +715,8 @@ function applyImportedState(data) {
   plan = data.plan || plan;
   done = data.done || done;
   dayPlan = data.dayPlan || { date: "", sig: "", ids: [] };
+  if (data.titleBooks)
+    titleBooks = ShitiTitleCode.normalizeBooks(data.titleBooks);
   if (data.sync) sync = { ...sync, ...data.sync, deviceId };
   return assetBag;
 }
@@ -679,6 +751,7 @@ async function importBackupFile(file) {
   let overwrite = confirm(
     "导入方式：确定=覆盖现有题库；取消=合并导入（保留现有，新增不重复）",
   );
+  const existingTitleBooks = [...titleBooks];
   let assets = applyImportedState(data);
   if (!overwrite) {
     let merged = new Map(questions.map((q) => [String(q.id), q]));
@@ -691,6 +764,10 @@ async function importBackupFile(file) {
         merged.set(id, normalizeQuestion(q));
     });
     questions = [...merged.values()];
+    titleBooks = ShitiTitleCode.normalizeBooks([
+      ...existingTitleBooks,
+      ...(Array.isArray(data.titleBooks) ? data.titleBooks : []),
+    ]);
     assets = [];
   } else {
     await clearAssets().catch(() => {});
@@ -702,6 +779,8 @@ async function importBackupFile(file) {
   save("shiti-done", done);
   save("shiti-dayplan", dayPlan);
   save("shiti-sync", sync);
+  saveTitleBooks();
+  resetDesktopTitleBuilder();
   currentSubject = "全部";
   render();
   toast(overwrite ? "备份已覆盖导入" : "备份已合并导入（新增不重复题）");
@@ -714,7 +793,7 @@ function downloadBackup() {
         new Blob(
           [
             JSON.stringify(
-              { questions, subjectConfig, plan, done, dayPlan, sync, assets },
+              { questions, subjectConfig, titleBooks, plan, done, dayPlan, sync, assets },
               null,
               2,
             ),
@@ -1683,12 +1762,51 @@ $("#questionForm").onsubmit = async (e) => {
   renderPendingAttachment("answer");
   if (!saveQuestions()) return;
   e.target.reset();
+  resetDesktopTitleBuilder();
   $("#modal").classList.remove("show");
   currentSubject = "全部";
   render();
   toast("错题已保存到本地");
 };
 $("#subjectSelect").onchange = () => updateModuleSelect();
+$("#desktopManageBooksBtn").onclick = () => {
+  const manager = $("#desktopBookManager");
+  const open = manager.classList.toggle("hidden") === false;
+  $("#desktopManageBooksBtn").setAttribute("aria-expanded", String(open));
+  if (open) $("#desktopNewBookCode").focus();
+};
+$("#desktopAddBookBtn").onclick = () => {
+  try {
+    titleBooks = ShitiTitleCode.addBook(titleBooks, {
+      code: $("#desktopNewBookCode").value,
+      name: $("#desktopNewBookName").value,
+    });
+    const code = titleBooks.at(-1).code;
+    saveTitleBooks();
+    renderDesktopTitleBooks(code);
+    $("#desktopNewBookCode").value = "";
+    $("#desktopNewBookName").value = "";
+    updateDesktopTitlePreview();
+    toast(`已添加书籍 ${code}`);
+  } catch (error) {
+    toast(error.message);
+  }
+};
+$("#desktopTitleBook").onchange = updateDesktopTitlePreview;
+for (const id of ["#desktopTitleChapter", "#desktopTitleQuestion"]) {
+  $(id).oninput = (event) => {
+    event.target.value = event.target.value.replace(/\D/g, "");
+    updateDesktopTitlePreview();
+  };
+}
+$("#desktopTitleNote").oninput = updateDesktopTitlePreview;
+$("#desktopUseTitleBtn").onclick = () => {
+  const value = $("#desktopUseTitleBtn").dataset.title;
+  if (!value) return;
+  $("#questionForm").elements.title.value = value;
+  $("#questionForm").elements.title.focus();
+  toast("快捷标题已填入，仍可继续修改");
+};
 $("#unitFilter").onchange = render;
 $("#sortFilter").onchange = render;
 $("#importBtn").onclick = () => $("#fileInput").click();
@@ -1727,6 +1845,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:")
   navigator.serviceWorker.register("./sw.js").catch(() => {});
 $("#generateExam").onclick = generateExamFromUi;
 $("#refreshExamHistory").onclick = renderExamHistory;
+saveTitleBooks();
+resetDesktopTitleBuilder();
 render();
 setTimeout(() => pullDesktopState(false), 200);
 setInterval(() => pullDesktopState(true), 5000);

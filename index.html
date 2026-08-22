@@ -376,8 +376,35 @@
           <button class="close-btn" id="closeModal">关闭</button>
         </div>
         <form id="questionForm">
+          <section class="title-builder desktop-title-builder" aria-labelledby="desktopTitleBuilderTitle">
+            <div class="title-builder-head">
+              <div>
+                <strong id="desktopTitleBuilderTitle">快捷标题</strong>
+                <span>格式：书籍-章节-题号(补充)</span>
+              </div>
+              <button id="desktopManageBooksBtn" class="ghost-btn" type="button" aria-expanded="false">管理书籍</button>
+            </div>
+            <div class="title-builder-grid">
+              <label>书籍<select id="desktopTitleBook"></select></label>
+              <label>章节号<input id="desktopTitleChapter" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="例如 0" /></label>
+              <label>题号<input id="desktopTitleQuestion" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="例如 12" /></label>
+              <label class="title-note-field">补充内容（可选）<input id="desktopTitleNote" maxlength="60" placeholder="例如 xxxx-xx-xx" /></label>
+            </div>
+            <div class="title-preview-row">
+              <div><span>生成预览</span><output id="desktopTitlePreview" aria-live="polite">请填写章节号和题号</output></div>
+              <button id="desktopUseTitleBtn" class="primary-btn" type="button" disabled>使用此标题</button>
+            </div>
+            <div id="desktopBookManager" class="book-manager hidden">
+              <div class="book-manager-fields">
+                <label>书籍代号<input id="desktopNewBookCode" maxlength="24" autocomplete="off" placeholder="例如 1000g" /></label>
+                <label>书名（可选）<input id="desktopNewBookName" maxlength="40" autocomplete="off" placeholder="例如 高数辅导讲义" /></label>
+              </div>
+              <button id="desktopAddBookBtn" class="ghost-btn" type="button">添加书籍</button>
+              <div id="desktopBookList" class="book-list" aria-label="已保存的书籍"></div>
+            </div>
+          </section>
           <label
-            >题目标题<input
+            >最终标题 <span class="label-hint">可使用上方快捷生成，也可完全自定义</span><input
               required
               name="title"
               placeholder="例如：矩阵特征值的计算"
@@ -600,6 +627,7 @@
     </div>
     <div class="toast" id="toast"></div>
     <script src="taxonomy-utils.js"></script>
+    <script src="mobile/title-code-utils.js"></script>
     <script src="mobile/crop-utils.js"></script>
     <script src="desktop-cropper.js"></script>
     <script src="app.js"></script>

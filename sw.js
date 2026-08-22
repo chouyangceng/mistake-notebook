@@ -1,10 +1,11 @@
-const CACHE = "shiti-app-v3";
+const CACHE = "shiti-app-v4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./styles-extra.css",
   "./taxonomy-utils.js",
+  "./mobile/title-code-utils.js",
   "./app.js",
   "./manifest.webmanifest",
   "./icon.svg",

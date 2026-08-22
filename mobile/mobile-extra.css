@@ -998,3 +998,106 @@ body.cropper-open {
     }
   }
 }
+
+.title-builder {
+  margin-top: 18px;
+  padding: 15px;
+  border: 1px solid #c9d9d1;
+  border-radius: 17px;
+  background: #f7faf8;
+}
+.title-builder-head,
+.title-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.title-builder-head strong,
+.title-builder-head span,
+.title-preview-row span,
+.title-preview-row output {
+  display: block;
+}
+.title-builder-head strong { color: #294c40; }
+.title-builder-head span,
+.title-preview-row span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.title-book-manage { flex: 0 0 auto; padding-inline: 13px; }
+.title-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.title-builder-grid label,
+.book-manager label { min-width: 0; font-size: 13px; }
+.title-builder-grid input,
+.title-builder-grid select { padding-inline: 10px; }
+.title-note-field { grid-column: 1 / -1; }
+.title-preview-row {
+  margin-top: 13px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #eaf2ed;
+}
+.title-preview-row > div { min-width: 0; }
+.title-preview-row output {
+  overflow-wrap: anywhere;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 800;
+}
+.title-preview-row output.invalid { color: var(--danger); }
+.title-preview-row .primary {
+  width: auto;
+  min-width: 112px;
+  margin: 0;
+}
+.book-manager {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid #d7e1dc;
+}
+.book-manager-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+.book-manager > button { width: 100%; margin-top: 10px; }
+.book-list { display: grid; gap: 7px; margin-top: 11px; }
+.book-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 9px 8px 11px;
+  border: 1px solid #dce4df;
+  border-radius: 11px;
+  background: #fff;
+}
+.book-list-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.book-list-item button {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 7px 11px;
+  background: #f7e4e1;
+  color: var(--danger);
+  font-size: 12px;
+}
+@media (max-width: 420px) {
+  .title-builder-head,
+  .title-preview-row { align-items: stretch; flex-direction: column; }
+  .title-book-manage,
+  .title-preview-row .primary { width: 100%; }
+  .title-builder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .title-builder-grid label:first-child,
+  .title-note-field { grid-column: 1 / -1; }
+}

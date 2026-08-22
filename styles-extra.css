@@ -192,3 +192,94 @@
 .text-prompt-modal {
   max-width: 480px;
 }
+
+.title-builder {
+  padding: 14px;
+  border: 1px solid #cfdcd6;
+  border-radius: 12px;
+  background: #f7faf8;
+}
+.title-builder-head,
+.title-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.title-builder-head strong,
+.title-builder-head span,
+.title-preview-row span,
+.title-preview-row output { display: block; }
+.title-builder-head strong { color: var(--accent); font-size: 14px; }
+.title-builder-head span,
+.title-preview-row span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.title-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.title-builder-grid label,
+.book-manager label { min-width: 0; }
+.title-note-field { grid-column: 1 / -1; }
+.title-preview-row {
+  padding: 10px 11px;
+  border-radius: 10px;
+  background: #e8f1ec;
+}
+.title-preview-row > div { min-width: 0; }
+.title-preview-row output {
+  overflow-wrap: anywhere;
+  color: var(--accent);
+  font-weight: 800;
+}
+.title-preview-row output.invalid { color: #a43d3d; }
+.title-preview-row .primary-btn { flex: 0 0 auto; min-height: 40px; }
+.book-manager { padding-top: 12px; border-top: 1px solid #d8e1dc; }
+.book-manager-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+.book-manager > button { width: 100%; }
+.book-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.book-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px 7px 10px;
+  border: 1px solid #dde5e1;
+  border-radius: 9px;
+  background: #fff;
+}
+.book-list-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #4d5d56;
+  font-size: 12px;
+}
+.book-list-item button {
+  flex: 0 0 auto;
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: #f7e4e1;
+  color: #9f2f2f;
+  font-size: 11px;
+}
+@media (max-width: 680px) {
+  .title-builder-head,
+  .title-preview-row { align-items: stretch; flex-direction: column; }
+  .title-builder-grid,
+  .book-manager-fields,
+  .book-list { grid-template-columns: 1fr; }
+  .title-note-field { grid-column: auto; }
+}

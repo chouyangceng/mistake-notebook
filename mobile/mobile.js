@@ -8,6 +8,7 @@ const endpointKey = "shiti-mobile-endpoint";
 const tokenKey = "shiti-mobile-token";
 const configKey = "shiti-mobile-subject-config";
 const configCustomKey = "shiti-mobile-config-customized";
+const titleBooksKey = "shiti-mobile-title-books";
 const CONFIG_SCHEMA_VERSION = 2;
 
 let selectedFile = null;
@@ -21,6 +22,7 @@ let removeExistingFile = false;
 let removeExistingAnswerFile = false;
 let editingKnowledgePath = [];
 let textPromptResolver = null;
+let titleBooks = loadTitleBooks();
 const cropState = {
   image: null,
   source: null,
@@ -180,6 +182,90 @@ function saveConfig(customized = false) {
   mobileConfig = normalizeConfig(mobileConfig);
   localStorage.setItem(configKey, JSON.stringify(mobileConfig));
   if (customized) localStorage.setItem(configCustomKey, "1");
+}
+
+function loadTitleBooks() {
+  try {
+    return ShitiTitleCode.normalizeBooks(
+      JSON.parse(localStorage.getItem(titleBooksKey) || "null"),
+    );
+  } catch {
+    return ShitiTitleCode.normalizeBooks(null);
+  }
+}
+
+function saveTitleBooks() {
+  titleBooks = ShitiTitleCode.normalizeBooks(titleBooks);
+  localStorage.setItem(titleBooksKey, JSON.stringify(titleBooks));
+}
+
+function titleBookLabel(book) {
+  return book.name ? `${book.code} · ${book.name}` : `${book.code} · 未命名书籍`;
+}
+
+function renderTitleBooks(selectedCode = "") {
+  const select = $("#mobileTitleBook");
+  const selected = selectedCode || select.value || titleBooks[0]?.code || "";
+  select.innerHTML = titleBooks
+    .map(
+      (book) =>
+        `<option value="${esc(book.code)}"${book.code === selected ? " selected" : ""}>${esc(titleBookLabel(book))}</option>`,
+    )
+    .join("");
+  if (!select.value && titleBooks[0]) select.value = titleBooks[0].code;
+  $("#mobileBookList").innerHTML = titleBooks
+    .map(
+      (book) =>
+        `<div class="book-list-item"><span><strong>${esc(book.code)}</strong>${book.name ? ` · ${esc(book.name)}` : " · 未命名书籍"}</span><button type="button" data-delete-title-book="${esc(book.code)}" aria-label="删除书籍 ${esc(book.code)}">删除</button></div>`,
+    )
+    .join("");
+  $$('[data-delete-title-book]').forEach((button) => {
+    button.onclick = () => {
+      if (titleBooks.length <= 1) return message("至少保留一本书");
+      const code = button.dataset.deleteTitleBook;
+      if (!confirm(`删除书籍「${code}」？已保存错题的标题不会改变。`)) return;
+      titleBooks = titleBooks.filter((book) => book.code !== code);
+      saveTitleBooks();
+      renderTitleBooks();
+      updateTitlePreview();
+      message("书籍已删除，已有错题标题保持不变", true);
+    };
+  });
+}
+
+function updateTitlePreview() {
+  const preview = $("#mobileTitlePreview");
+  const button = $("#mobileUseTitleBtn");
+  try {
+    const value = ShitiTitleCode.buildQuestionTitle({
+      bookCode: $("#mobileTitleBook").value,
+      chapter: $("#mobileTitleChapter").value,
+      question: $("#mobileTitleQuestion").value,
+      note: $("#mobileTitleNote").value,
+    });
+    preview.textContent = value;
+    preview.classList.remove("invalid");
+    button.disabled = false;
+    button.dataset.title = value;
+  } catch (error) {
+    preview.textContent = error.message;
+    preview.classList.add("invalid");
+    button.disabled = true;
+    button.dataset.title = "";
+  }
+}
+
+function resetTitleBuilder(title = "") {
+  const parsed = ShitiTitleCode.parseQuestionTitle(title);
+  if (parsed && !titleBooks.some((book) => book.code === parsed.bookCode)) {
+    titleBooks.push({ code: parsed.bookCode, name: "" });
+    saveTitleBooks();
+  }
+  renderTitleBooks(parsed?.bookCode || "");
+  $("#mobileTitleChapter").value = parsed?.chapter || "";
+  $("#mobileTitleQuestion").value = parsed?.question || "";
+  $("#mobileTitleNote").value = parsed?.note || "";
+  updateTitlePreview();
 }
 
 function message(text, ok = false) {
@@ -954,6 +1040,7 @@ function resetForm() {
   $("#cancelEditBtn").classList.add("hidden");
   $("#contentError").textContent = "";
   $("#classificationError").textContent = "";
+  resetTitleBuilder();
   previewFile("", "", "");
   previewFile("", "", "", false, "answer");
 }
@@ -1047,6 +1134,7 @@ async function editQuestion(id, focusClassification = false) {
   updateQuestionTypes(item.questionType);
   updateClassification(editingKnowledgePath);
   form.elements.title.value = item.title || "";
+  resetTitleBuilder(item.title || "");
   form.elements.question.value = item.question || "";
   form.elements.topic.value = Array.isArray(item.topic)
     ? item.topic.join(", ")
@@ -1636,6 +1724,7 @@ async function exportBackup() {
       format: "shiti-mobile-offline-v2",
       exportedAt: now(),
       subjectConfig: mobileConfig,
+      titleBooks,
       questions,
     },
     null,
@@ -1682,6 +1771,14 @@ async function importBackup(file) {
       mobileConfig = normalizeConfig(data.subjectConfig);
       saveConfig(true);
       refreshConfigUi();
+    }
+    if (data.titleBooks) {
+      titleBooks = ShitiTitleCode.normalizeBooks([
+        ...titleBooks,
+        ...(Array.isArray(data.titleBooks) ? data.titleBooks : []),
+      ]);
+      saveTitleBooks();
+      resetTitleBuilder();
     }
     await renderAll();
     message(`备份已合并，更新 ${merged} 道错题`, true);
@@ -1764,6 +1861,44 @@ $("#questionGalleryBtn").onclick = () => $("#file").click();
 $("#answerCameraBtn").onclick = () => $("#answerCameraFile").click();
 $("#answerGalleryBtn").onclick = () => $("#answerFile").click();
 $("#cancelEditBtn").onclick = resetForm;
+$("#mobileManageBooksBtn").onclick = () => {
+  const manager = $("#mobileBookManager");
+  const open = manager.classList.toggle("hidden") === false;
+  $("#mobileManageBooksBtn").setAttribute("aria-expanded", String(open));
+  if (open) $("#mobileNewBookCode").focus();
+};
+$("#mobileAddBookBtn").onclick = () => {
+  try {
+    titleBooks = ShitiTitleCode.addBook(titleBooks, {
+      code: $("#mobileNewBookCode").value,
+      name: $("#mobileNewBookName").value,
+    });
+    const code = titleBooks.at(-1).code;
+    saveTitleBooks();
+    renderTitleBooks(code);
+    $("#mobileNewBookCode").value = "";
+    $("#mobileNewBookName").value = "";
+    updateTitlePreview();
+    message(`已添加书籍 ${code}`, true);
+  } catch (error) {
+    message(error.message);
+  }
+};
+$("#mobileTitleBook").onchange = updateTitlePreview;
+for (const id of ["#mobileTitleChapter", "#mobileTitleQuestion"]) {
+  $(id).oninput = (event) => {
+    event.target.value = event.target.value.replace(/\D/g, "");
+    updateTitlePreview();
+  };
+}
+$("#mobileTitleNote").oninput = updateTitlePreview;
+$("#mobileUseTitleBtn").onclick = () => {
+  const value = $("#mobileUseTitleBtn").dataset.title;
+  if (!value) return;
+  $("#questionForm").elements.title.value = value;
+  $("#questionForm").elements.title.focus();
+  message("快捷标题已填入，仍可继续修改", true);
+};
 $("#mobileSubject").onchange = () => {
   editingKnowledgePath = [];
   updateQuestionTypes();
@@ -2215,6 +2350,8 @@ $("#mobileTextPromptForm").onsubmit = (event) => {
 };
 $("#token").value = localStorage.getItem(tokenKey) || "";
 saveConfig(false);
+saveTitleBooks();
+resetTitleBuilder();
 updateQuestionTypes();
 updateClassification();
 renderAll().catch(() => message("无法读取手机题库，请检查应用存储空间"));

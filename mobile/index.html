@@ -84,8 +84,40 @@
               aria-live="assertive"
             ></p>
           </fieldset>
+          <section class="title-builder" aria-labelledby="mobileTitleBuilderTitle">
+            <div class="title-builder-head">
+              <div>
+                <strong id="mobileTitleBuilderTitle">快捷标题</strong>
+                <span>按“书籍-章节-题号(补充)”生成</span>
+              </div>
+              <button id="mobileManageBooksBtn" class="secondary title-book-manage" type="button" aria-expanded="false">
+                管理书籍
+              </button>
+            </div>
+            <div class="title-builder-grid">
+              <label>书籍<select id="mobileTitleBook"></select></label>
+              <label>章节号<input id="mobileTitleChapter" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="例如 0" /></label>
+              <label>题号<input id="mobileTitleQuestion" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="例如 12" /></label>
+              <label class="title-note-field">补充内容（可选）<input id="mobileTitleNote" maxlength="60" placeholder="例如 xxxx-xx-xx" /></label>
+            </div>
+            <div class="title-preview-row">
+              <div>
+                <span>生成预览</span>
+                <output id="mobileTitlePreview" aria-live="polite">请填写章节号和题号</output>
+              </div>
+              <button id="mobileUseTitleBtn" class="primary compact" type="button" disabled>使用此标题</button>
+            </div>
+            <div id="mobileBookManager" class="book-manager hidden">
+              <div class="book-manager-fields">
+                <label>书籍代号<input id="mobileNewBookCode" maxlength="24" autocapitalize="none" autocomplete="off" placeholder="例如 1000g" /></label>
+                <label>书名（可选）<input id="mobileNewBookName" maxlength="40" autocomplete="off" placeholder="例如 高数辅导讲义" /></label>
+              </div>
+              <button id="mobileAddBookBtn" class="secondary" type="button">添加书籍</button>
+              <div id="mobileBookList" class="book-list" aria-label="已保存的书籍"></div>
+            </div>
+          </section>
           <label
-            >标题<input
+            >最终标题 <span class="required-hint">可使用上方快捷生成，也可完全自定义</span><input
               name="title"
               required
               maxlength="120"
@@ -481,6 +513,7 @@
         </div>
       </section>
     </div>
+    <script src="title-code-utils.js" defer></script>
     <script src="crop-utils.js" defer></script>
     <script src="mobile.js" defer></script>
   </body>
