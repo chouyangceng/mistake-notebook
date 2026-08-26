@@ -1,6 +1,6 @@
-# 拾题 · 考研错题本 1.6.2
+# 拾题 · 错题本 1.6.2
 
-本地优先的考研错题管理工具，包含 Windows Electron 桌面端、浏览器/PWA 版和离线优先的 Android 端。科目固定为英语、数学、822控制；政治和通用“专业课”已从产品数据模型中移除。
+本地优先的错题管理工具，包含 Windows Electron 桌面端、浏览器/PWA 版和离线优先的 Android 端。科目固定为英语、数学、822控制；政治和通用“专业课”已从产品数据模型中移除。
 
 > 平台状态：Windows 当前版本为 1.6.2，Android 当前版本为 1.6.5。Mac 暂时保留最后确认正常的 1.1.0 arm64 构建，不从当前 `main` 直接重发；详见 `MAC稳定版基线.md`。
 
@@ -58,6 +58,6 @@ APK 内置 `mobile/` 页面，通过 AndroidX `WebViewAssetLoader` 从安全的�
 
 ## 在线访问
 
-浏览器版：[https://chouyangceng.github.io/mistake-notebook-kaoyan/](https://chouyangceng.github.io/mistake-notebook-kaoyan/)
+浏览器版：[https://chouyangceng.github.io/mistake-notebook/](https://chouyangceng.github.io/mistake-notebook/)
 
 浏览器版数据按浏览器配置隔离，不会自动读取 Electron 或 Android 的本地数据库；需要时使用备份或局域网同步。

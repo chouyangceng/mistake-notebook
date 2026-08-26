@@ -1,7 +1,7 @@
 {
-  "name": "拾题 · 考研错题本",
+  "name": "拾题 · 错题本",
   "short_name": "拾题",
-  "description": "本地优先、可同步的考研错题本",
+  "description": "本地优先、可同步的错题本",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

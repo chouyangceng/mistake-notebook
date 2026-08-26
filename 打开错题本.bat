@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title 拾题 · 考研错题本
+title 拾题 · 错题本
 set PORT=8732
 
 REM 检查 python 是否可用（Windows 需要 Python 3）

@@ -1,7 +1,7 @@
 {
   "name": "shiti-kaoyan",
   "version": "1.6.2",
-  "description": "拾题 · 考研错题本（本地优先，局域网多端同步）",
+  "description": "拾题 · 错题本（本地优先，局域网多端同步）",
   "main": "main.js",
   "author": "chouyangceng",
   "license": "MIT",
@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "com.shiti.kaoyan",
-    "productName": "拾题考研错题本",
+    "productName": "拾题错题本",
     "directories": {
       "output": "release",
       "buildResources": "build"
